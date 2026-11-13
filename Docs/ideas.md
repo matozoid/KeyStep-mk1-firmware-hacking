@@ -38,3 +38,40 @@ adapted to the Mk1.
   send them when the values differ from what was last sent on that channel since power-on (first
   send always goes out). Avoids synths reloading a patch, and playing the first note late, on every
   sequence switch. (Also from yonie/keystep-mods.)
+
+## Playing
+
+From [canadianblaken/keystep-con](https://github.com/canadianblaken/keystep-con) (KSCON, KeyStep Pro
+firmware patch), adapted to the Mk1.
+
+- **Step play.** Each key press plays the next step of the current sequence (its pitches or chord), so
+  a stored line can be played in your own rhythm with one finger. Reuses the sequence data as is.
+- **Root chords / scale chords.** Stock chord mode needs a chord set up by holding notes. Instead: one
+  key sets the root and other keys pick a chord type (maj, min, 7, sus, …); or a diatonic variant where
+  a scale is chosen and each key plays its scale chord. Works with the arpeggiator, so held chords
+  can be arpeggiated.
+- **Bass generator.** Turns chords into a bass line, with styles Root, Root + 5th, Octaves, Pulse and
+  Follow rhythm. On the Mk1 this could be an extra arp mode, or a track that follows chords coming in
+  on the MIDI transpose input. Natural fit for the CV output driving a mono bass synth.
+- **Mod strip lock.** Shift + touch the mod strip freezes it: no CC or mod CV is sent until toggled
+  again.
+- **Drum lanes.** With 16 tracks per sequence, keys 1–16 can act as drum lanes (GM notes on channel 10)
+  while another channel is played from the keys. Overlaps with Pulse (Euclidean rhythms).
+
+## Tooling
+
+Also from KSCON, which ships a single-page web app alongside its firmware patch. Even more useful on
+the Mk1, which has no screen.
+
+- **Web MIDI editor.** A single HTML page talking SysEx: piano-roll editing of the 8 sequences, all
+  settings (including ones MCC doesn't expose), single-file backup/restore of everything, `.mid`
+  import/export. Include a simulated KeyStep so the page works without hardware.
+- **Browser flasher.** The bootloader protocol is decoded ([bootloader_protocol.md](bootloader_protocol.md)),
+  so the page could flash the firmware over Web MIDI without MIDI Control Center.
+- **Playable manual.** A clickable virtual KeyStep with help on each control and Shift combination.
+  Shift-combo features on a screenless device are hard to discover otherwise.
+- **Stock bug catalogue.** KSCON documents stock firmware quirks and their workarounds. A
+  `re/stock_bugs.md` for the Mk1 would give the replacement firmware a checklist of things to fix.
+- **Whole-image emulation tests.** KSCON runs its firmware code in a Unicorn emulator with stubbed
+  hardware calls. Complements the existing host unit tests (`Firmware/tests`) by exercising the real
+  ARM build: boot, main loop, sequencer/arp timing.
