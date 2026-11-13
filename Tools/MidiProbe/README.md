@@ -1,4 +1,4 @@
-# KeyStep Linux MIDI Probe
+# KeyStep Linux MIDI probe
 
 A KeyStep MK1 in bootloader mode shows up like this:
 
@@ -35,20 +35,11 @@ This only sends the standard MIDI Universal Device Inquiry SysEx:
 F0 7E 7F 06 01 F7
 ```
 
-It does not write firmware.
+It does not write firmware. The bootloader's real protocol is in
+[`Docs/bootloader_protocol.md`](../../Docs/bootloader_protocol.md).
 
 ## Inspect the .led
 
 ```bash
-python3 keystep_led_inspect.py keystep_Firmware_Update__1_0_28.led
+python3 keystep_led_inspect.py vendor/update.led
 ```
-
-## What to report back
-
-Share the full output of:
-
-```bash
-python3 keystep_bootloader_probe.py --identity
-```
-
-Depending on the response, we determine whether the bootloader accepts standard SysEx commands or whether proprietary commands need to be discovered.

@@ -1,0 +1,118 @@
+0x08009d44	SysTick_Handler
+0x08008ee4	HardFault_Handler
+0x080047c4	FLASH_IRQHandler
+0x0800455c	EXTI0_IRQHandler	sync in clock PD0
+0x08004738	EXTI3_IRQHandler	sync in start/stop PD3
+0x08004520	DMA1_Channel1_IRQHandler	ADC1 DMA
+0x0800bd98	USB_HP_CAN1_TX_IRQHandler
+0x0800bda8	USB_LP_CAN1_RX0_IRQHandler
+0x08009f08	TIM2_IRQHandler	internal clock
+0x08009f58	TIM4_IRQHandler
+0x0800a440	USART1_IRQHandler	DIN MIDI
+0x080041d4	scatterload_and_ctors
+0x08005f78	HAL_GPIO_DeInit
+0x080060d0	HAL_GPIO_Init
+0x08006410	HAL_GPIO_ReadPin
+0x08006420	HAL_GPIO_WritePin
+0x08006714	HAL_I2C_Mem_Write
+0x080064e8	HAL_I2C_Mem_Read
+0x08006e78	HAL_PCD_IRQHandler
+0x08007a8c	HAL_RCC_OscConfig
+0x080050c0	HAL_DAC_Start
+0x08008baa	HAL_TIM_PWM_ConfigChannel
+0x08008d50	HAL_TIM_PWM_Start
+0x0800cd94	SystemClock_Config
+0x08009388	MX_GPIO_Init
+0x080092a0	MX_ADC1_Init	5 ch PC0-PC4
+0x08009328	MX_DAC_Init
+0x08009590	MX_I2C1_Init
+0x080095c8	MX_I2C2_Init
+0x08009600	MX_IWDG_Init
+0x08009624	MX_SPI2_Init	LED shift register
+0x08009664	MX_TIM2_Init
+0x080096b0	MX_TIM3_Init	pitch CV PWM CH1/CH2, LED OE CH4
+0x08009710	MX_TIM4_Init
+0x0800975c	MX_USART1_Init	31250 baud
+0x08019538	app_objects_ctor
+0x0800c1f4	app_main
+0x08016610	keymatrix_ctor
+0x080165ea	keymatrix_select
+0x080165b8	keymatrix_read
+0x080165cc	keymatrix_reset
+0x0800dff8	buttonbus_ctor
+0x0800dfb0	buttonbus_select	PE7/PB2
+0x0800df78	buttonbus_read	PD8-PD15 inverted
+0x0800df8c	buttonbus_reset
+0x08011b8c	scanner_ctor
+0x08011b52	scanner_scan_all
+0x0801511a	button_bit_ctor
+0x08015102	button_bit_read
+0x0800f9d2	button_ctor	id, led
+0x0800f2d8	button_poll
+0x0800f3a0	button_on_press
+0x0800f7f0	button_on_release
+0x0800f980	button_debounce
+0x08017eb0	keyboard_init	velocity curves
+0x08016f78	keyboard_process
+0x08013dd8	leds_init
+0x08013ae8	leds_set_bit
+0x08013ab0	leds_blink
+0x08013b3e	leds_blink_stop
+0x08013b54	leds_blink_tick
+0x08013da4	leds_flush	SPI2 + PB12 latch
+0x0801378a	leds_latch_write
+0x08013b12	leds_set_brightness_pct	TIM3 CH4 PC9
+0x0801379c	leds_boot_animation
+0x08013172	pitch_cv_ctor
+0x080130fa	pitch_cv_start
+0x08013114	pitch_cv_write8
+0x08013154	pitch_cv_write16	PC6 hi / PC7 lo
+0x08018d9c	pitch_cv_from_note_bend
+0x08013354	mod_cv_ctor
+0x080132ac	mod_cv_start
+0x08013256	mod_cv_write12	DAC ch1 PA4
+0x08013290	mod_cv_set_range_mv
+0x080134a8	gate_ctor
+0x08013374	gate_set_level_mode	PA2/PA0
+0x0801345c	gate_write	PA1 inverted
+0x080150e6	sync_ctor
+0x08015018	sync_read_clock_in
+0x0801504a	sync_clock_thru
+0x08015064	sync_read_start_in
+0x08015096	sync_start_thru
+0x080131ac	adc_sampler_ctor
+0x0801318e	adc_sampler_attach
+0x080131ce	adc_sampler_start_dma
+0x080131e4	adc_sampler_dispatch
+0x080131bc	adc_sampler_dma_done
+0x080134d8	tempo_knob_process
+0x08011a88	sustain_input_process
+0x08011b04	sustain_detect_polarity
+0x08011da4	mode_knob_process
+0x0801307c	timediv_knob_process
+0x0800d1dc	aftertouch_process
+0x0801120e	touchstrip_ctor
+0x0800d020	touchstrip_chip_init
+0x0800cbdc	touchstrip_chip_verify
+0x08011250	i2c_bus_recover
+0x080111ec	touchstrip_read
+0x08011192	touchstrip_scaled
+0x0800be40	pitchbend_strip_process
+0x0800c0f0	modstrip_process
+0x08019b0c	midi_router_get
+0x080169c4	midi_out_usb
+0x080166c8	midi_out_din
+0x08016930	cv_note_event
+0x08016a20	cv_mod_set
+0x08016650	cv_gate_set
+0x08015c08	seq_flash_is_empty
+0x08015bd0	seq_flash_erase_all
+0x08015cd0	settings_load
+0x08015eb8	touchstrip_cal_load
+0x080187b4	settings_sanitize
+0x0801894a	settings_broadcast
+0x08014070	ui_set_seq_arp
+0x080141e4	ui_hold
+0x08018a46	syncswitch_ctor
+0x08018994	syncswitch_process
+0x08011cb4	seqarp_switch_process

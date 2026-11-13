@@ -1,22 +1,28 @@
 # Keyboard matrix
 
-## Logical pinout
+32 keys, two contacts each (A closes first, B closes at the bottom of the travel). Velocity comes
+from the time between A and B: short = hard, long = soft. The stock firmware maps that time through
+one of three curves (linear, logarithmic, exponential).
+
+## Pins
 
 ```text
-Select lines: PE8, PE9, PE10, PE11, PE12, PE13, PE14, PE15
-Read lines:   PD8, PD9, PD10, PD11, PD12, PD13, PD14, PD15
-Logic: active-low
+Select lines: PE8–PE15, outputs, one driven low at a time
+Read lines:   PD8–PD15, inputs, active low
 ```
 
-## Basic scanning
+The buttons share PD8–PD11 as their read lines (selected by PE7 / PB2 instead), so the keybed select
+lines must all be high while buttons are scanned, and the other way round.
+
+## Scanning
 
 ```c
 static uint8_t scan_row(uint8_t row)
 {
-    GPIOE->ODR |= 0xFF00;              // all inactive HIGH
-    GPIOE->ODR &= ~(1u << (8 + row));  // one row active LOW
+    GPIOE->ODR |= 0xFF00;              // all select lines high
+    GPIOE->ODR &= ~(1u << (8 + row));  // select one row (low)
 
-    for (volatile int i = 0; i < 80; i++) {}
+    for (volatile int i = 0; i < 80; i++) {}   // settle
 
     return (uint8_t)(~(GPIOD->IDR >> 8) & 0xFF);
 }
@@ -24,35 +30,14 @@ static uint8_t scan_row(uint8_t row)
 
 ## Contact mapping
 
-```text
-Key group 0 (8 keys):
-  contact A → PE8  reads PD8–PD15
-  contact B → PE9  reads PD8–PD15
-
-Key group 1 (8 keys):
-  contact A → PE10 reads PD8–PD15
-  contact B → PE11 reads PD8–PD15
-
-Key group 2 (8 keys):
-  contact A → PE12 reads PD8–PD15
-  contact B → PE13 reads PD8–PD15
-
-Key group 3 (8 keys):
-  contact A → PE14 reads PD8–PD15
-  contact B → PE15 reads PD8–PD15
-```
-
-For `keyIndex` from 0 to 31:
+For `key` 0–31 (0 = lowest):
 
 ```text
-group  = keyIndex / 8
-column = keyIndex % 8
+group  = key / 8
+column = key % 8
 
-Contact A:
-  select = PE(8 + group*2)
-  read   = PD(8 + column)
-
-Contact B:
-  select = PE(8 + group*2 + 1)
-  read   = PD(8 + column)
+Contact A: select PE(8 + group*2),     read PD(8 + column)
+Contact B: select PE(8 + group*2 + 1), read PD(8 + column)
 ```
+
+Example: key 0 = PE8/PD8 (A), PE9/PD8 (B). Key 31 = PE14/PD15 (A), PE15/PD15 (B).

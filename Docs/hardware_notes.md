@@ -1,60 +1,25 @@
 # Hardware notes
 
+Quick reference. The full map with evidence addresses is in
+[`re/hardware_map.md`](re/hardware_map.md).
+
 ## Device
 
-- Arturia KeyStep Mk1 / KeyStep 32
-- MCU observed on the board: `STM32F103VCT6`
-- Architecture: ARM Cortex-M3
-- Expected flash/RAM for this variant: 256 KB flash / 48 KB RAM
+- Arturia KeyStep Mk1 (KeyStep 32)
+- MCU: STM32F103VCT6, Cortex-M3, 72 MHz (8 MHz HSE × 9), 256 KB flash, 48 KB RAM
+- Bootloader `0x08000000–0x08003FFF`, application at `0x08004000`
 
-## Application base address
+## Outputs
 
-During analysis of the official firmware, the application was treated as based at:
+| Output | Stock firmware | Notes |
+|---|---|---|
+| Pitch CV | TIM3 PWM: PC6 (high byte) + PC7 (low byte), summed into one 16-bit voltage | Not a DAC output |
+| Mod CV | DAC channel 1 (PA4), 12-bit | KeyFreak found audio on PA5 (DAC channel 2). Unresolved — measure on hardware |
+| Gate | PA1, inverted; PA2/PA0 select the gate level | |
 
-```text
-0x08004000
-```
+None of these are audio outputs. Don't connect headphones.
 
-## Relevant DAC outputs
+## Inputs
 
-```text
-PA4 = DAC_OUT1 / DAC1 / Pitch CV
-PA5 = DAC_OUT2 / DAC2 / Mod CV
-```
-
-On the tested unit:
-
-```text
-Mod CV / PA5 / DAC2 = working audio output
-Pitch CV / PA4 / DAC1 = did not work as usable audio
-```
-
-## Keyboard matrix
-
-The real matrix was identified from Ghidra:
-
-```c
-InputScanner8_Init(DAT_080196e4, DAT_080196e0, 8, DAT_080196dc, 8);
-```
-
-With:
-
-```text
-DAT_080196e4 = 0x20000F44   scanner object
-DAT_080196e0 = 0x40011800   GPIOE
-DAT_080196dc = 0x40011400   GPIOD
-```
-
-Therefore:
-
-```text
-PE8–PE15 = select, active-low
-PD8–PD15 = read, active-low
-```
-
-This gives:
-
-```text
-8 selects × 8 reads = 64 contacts
-32 keys × 2 contacts = 64 contacts
-```
+- Keybed: see [`keyboard_matrix.md`](keyboard_matrix.md).
+- Buttons, switches, knobs, pedal, aftertouch, touch strips, sync and MIDI: see the hardware map.
