@@ -23,8 +23,10 @@ in the application image (linked at `0x08004000`). Function names are the ones i
 | `0x0803B000 + n*0x800`, n=0..7 | 8 × 2 KB | 8 sequences (RAM copies at `0x200022C8 + n*0x408`) | `seq_flash_is_empty` 0x08015c08, `seq_flash_erase_all` 0x08015bd0 |
 | `0x0803F000` | 0x80 bytes | global settings → RAM `0x20005084` | 0x08015cd0 |
 | `0x0803F200` | 4 bytes | touch-strip calibration (min/max for pitch & mod strip; default 0xBF/0x09) | 0x08015eb8 |
+| `0x0803F800` | 8 bytes | bootloader request flag `0xA33A95FF, 0xAAA55A55`, written by SysEx `'&'` (?) | 0x08015c80 |
 
-Holding both octave buttons at power-on erases the sequence pages (`main` 0x0800c1f4).
+Holding both octave buttons at power-on is the factory reset (manual 3.1.7: resets everything). The code
+erases the sequence pages there (`main` 0x0800c1f4); whether settings are also reset is not yet traced.
 
 ## Pins
 
@@ -36,7 +38,7 @@ Holding both octave buttons at power-on erases the sequence pages (`main` 0x0800
 | Matrix read (inputs) | PD8–PD15 | read `GPIOD->IDR >> 8`, inverted (active low) |
 
 Object `KeyMatrix` @ `0x20000F44`, ctor 0x08016610, select 0x080165ea, read 0x080165b8.
-Velocity = time between the two contacts; three 6-segment curves (lin/log/exp)
+Velocity = time between the two contacts; three 6-segment curves (Log / Lin / AntiLog in MCC)
 built in `keyboard_init` 0x08017eb0. Scan/note logic: 0x08016f78.
 
 ### Buttons (8, shared read bus with keybed)
@@ -53,20 +55,20 @@ Button objects (ctor 0x0800f9d2, handler press 0x0800f3a0 / release 0x0800f7f0, 
 
 | id | RAM obj | LED bit | Function (from handler) |
 |---|---|---|---|
-| 0 | 0x2000129C | 2 | Hold (?) — LED 2 is also driven by the sustain/hold input |
-| 1 | 0x200012D0 | 7 | Shift (sets "shift held" flag 0x2000005F; suppresses knobs) |
-| 2 | 0x20001304 | 4 | Octave − (?) (flag 0x2000005E) |
-| 3 | 0x20001338 | — | Octave + (?) (flag 0x2000005D) |
-| 4 | 0x2000136C | 6 | Record |
-| 5 | 0x200013A0 | — | Tap / Chord (?) |
-| 6 | 0x200013D4 | 0 | Stop (3 presses → CC 123 All Notes Off on all 16 channels) |
-| 7 | 0x20001408 | 1 | Play |
+| 0 | 0x2000129C | 2 | Hold; Shift+Hold = Chord mode. LED 2 is also driven by the sustain pedal |
+| 1 | 0x200012D0 | 7 | Shift (flag 0x2000005F; knob changes deferred until release, manual 4.3.4) |
+| 2 | 0x20001304 | 4 | Oct − (flag 0x2000005E); Shift+Oct− = Transpose mode |
+| 3 | 0x20001338 | — (?) | Oct + (flag 0x2000005D); Shift+Oct+ = Kbd Play mode |
+| 4 | 0x2000136C | 6 | Record; Shift+Rec = append |
+| 5 | 0x200013A0 | — (?) | Tap tempo / Rest / Tie |
+| 6 | 0x200013D4 | 0 | Stop (3 presses → CC 123 All Notes Off on all 16 channels); Shift+Stop = clear last step |
+| 7 | 0x20001408 | 1 | Play/Pause; Shift+Play = restart |
 
 ### Switches
 
 | Function | Pins | Evidence |
 |---|---|---|
-| Sync source selector (2-bit) | PE2, PE3 (2-bit, inverted) | 0x08018a46, 0x08018994 → clock `set_source` 0x0800e5d0 |
+| Sync source selector: Internal / USB / MIDI / Sync In (both down = Internal) | PE2, PE3 (2-bit, inverted) | 0x08018a46, 0x08018994 → clock `set_source` 0x0800e5d0 |
 | Seq / Arp mode switch | PE4 | 0x08011cb4 → `ui_set_seq_arp` 0x08014070 |
 | PD4 (?) | PD4 | 0x0800f20c, only changes LED fade mode — power/USB detect (?) |
 
@@ -76,8 +78,8 @@ Button objects (ctor 0x0800f9d2, handler press 0x0800f3a0 / release 0x0800f7f0, 
 |---|---|---|---|
 | 1 | PC0 / 10 | Tempo knob → 30.00–240.00 BPM | 0x080134d8, 0x0801360c |
 | 2 | PC1 / 11 | Sustain/Hold pedal (digital with hysteresis, polarity sampled at boot) | 0x08011a88, 0x08011b04 |
-| 3 | PC2 / 12 | Mode knob, 8 detents (arp mode / sequence 1–8) | 0x08011da4 |
-| 4 | PC3 / 13 | Time-division knob, 8 detents | 0x0801307c → 0x0800e42c |
+| 3 | PC2 / 12 | Seq/Arp Mode knob, 8 detents: sequence 1–8, or arp Up / Down / Inclusive / Exclusive / Random / Order / Up×2 / Down×2 | 0x08011da4 |
+| 4 | PC3 / 13 | Time-division knob, 8 detents (straight and triplet values) | 0x0801307c → 0x0800e42c |
 | 5 | PC4 / 14 | Aftertouch sensor → channel pressure (0xD0) | 0x0800d1dc |
 
 ADC init 0x080092a0, handle `0x200004D8`, sampler object `0x2000114C`.
@@ -98,11 +100,11 @@ Two identical capacitive touch controllers, 8-bit I2C address `0x2A` (7-bit `0x1
 
 | Output | Hardware | Evidence |
 |---|---|---|
-| Pitch CV | TIM3 full remap, 8-bit PWM: **PC6 = CH1 high byte, PC7 = CH2 low byte** (summed externally → 16-bit). Value from calibration table, clamped to 0x1086B | `pitch_cv_write16` 0x08013154, note→CV 0x08018d9c |
+| Pitch CV | TIM3 full remap, 8-bit PWM: **PC6 = CH1 high byte, PC7 = CH2 low byte** (summed externally → 16-bit). 533 codes/semitone, V/oct or Hz/V, no per-unit calibration — see [pitch_cv.md](pitch_cv.md) | `pitch_cv_write16` 0x08013154, note→CV 0x08018d9c |
 | Mod CV | DAC ch1 (PA4), 12-bit, scaled by max-voltage setting (settings+0x7B, 5–12 V) | 0x08013256, 0x08016a20 |
 | Mod CV source | settings+0x7A: 0 mod strip, 1 velocity, 2 aftertouch | 0x0800c0f0, 0x08016930, 0x0800d1dc |
-| Gate | PA1, output inverted (transistor driver) | `gate_write` 0x0801345c |
-| Gate level select | PA2/PA0: mode 0 → 1/1, 1 → 1/0, 2 → 0/1 (settings+0x73) | 0x08013374 |
+| Gate | PA1, output inverted (transistor driver); logic polarity flipped in mode 0 (S-trig) | `gate_write` 0x0801345c |
+| Gate type | settings+0x73, PA2/PA0: 0 S-trig → 1/1, 1 V-trig 5 V → 1/0, 2 V-trig 12 V → 0/1 (names from manual order + polarity flip) | 0x08013374 |
 
 Note: the KeyFreak author reports PA5 behaves as Mod CV. The stock firmware only configures DAC
 channel 1 (PA4); verify on hardware.
@@ -116,8 +118,10 @@ channel 1 (PA4); verify on hardware.
 | Sync out clock | PB8 | |
 | Sync out start/stop | PD2 | |
 
-Sync object `0x20001134` (ctor 0x080150e6). Out PPQN from settings+0x4C:
-cases 0–4 → 48 / 8 / 4 / 48 / 96 (0x0800e96c).
+Sync object `0x20001134` (ctor 0x080150e6). Clock type from settings+0x4C (0x0800e96c). The value is
+internal ticks per pulse at 192 PPQN: cases 0–4 → 48 / 8 / 4 / 48 / 96. So 1 = 24 PPQ, 2 = 48 PPQ;
+0, 3, 4 are the step types (manual: 1 step Gate, 1 step Clock, 1 pulse Korg; default 1 step Clock),
+exact order unconfirmed. Sync start mode settings+0x4F: On Clock / On Gate Start (TRS ring).
 
 ### LEDs
 
@@ -147,13 +151,16 @@ PC14/PC15 outputs cleared at boot (?).
 | +0x04..+0x23 | listener list (≤ 8), count at +0x24 |
 | +0x40 | mod strip CC number |
 | +0x42 | MIDI channel (copied to 0x20000052) |
-| +0x4C | sync out rate index |
-| +0x4F | sync in start/stop mode |
+| +0x4C | sync clock type (see Sync) |
+| +0x4F | sync start: On Clock / On Gate Start |
 | +0x58..+0x5C | booleans, range-checked in 0x080187b4 |
-| +0x72/+0x76/+0x78/+0x7C | velocity curve settings (?) (0x08018f9c) |
-| +0x73 | gate level mode (0–2) |
+| +0x72 | pitch CV mode: 0 V/oct, 1 Hz/V |
+| +0x76 | V/oct 0 V note (default 0) |
+| +0x78 | Hz/V reference note (default 24) |
+| +0x7C | pitch-bend range, 1–24 semitones (default 2) |
+| +0x73 | gate type: 0 S-trig, 1 V-trig 5 V, 2 V-trig 12 V |
 | +0x7A | mod CV source |
-| +0x7B | mod CV max voltage (V) |
+| +0x7B | mod CV max voltage, 5–12 V |
 | +0x97 | LED brightness % |
 | +0xA9 | factory-test mode flag |
 

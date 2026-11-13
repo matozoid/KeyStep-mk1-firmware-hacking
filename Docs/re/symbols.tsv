@@ -116,3 +116,9 @@
 0x08018a46	syncswitch_ctor
 0x08018994	syncswitch_process
 0x08011cb4	seqarp_switch_process
+0x08018eec	pitch_cv_note_to_code	V/oct or Hz/V
+0x08018f9c	pitch_cv_on_settings	settings 0x72/0x76/0x78/0x7C
+0x08016694	cv_pitch_set
+0x08019bec	hzv_table	89 x u32, 0x18FC0000*2^((i-48)/12)
+0x080120c4	sysex_command_handler
+0x08015c80	bootloader_flag_write	0x0803F800
