@@ -63,11 +63,23 @@ firmware patch), adapted to the Mk1.
 Also from KSCON, which ships a single-page web app alongside its firmware patch. Even more useful on
 the Mk1, which has no screen.
 
-- **Web MIDI editor.** A single HTML page talking SysEx: piano-roll editing of the 8 sequences, all
-  settings (including ones MCC doesn't expose), single-file backup/restore of everything, `.mid`
-  import/export. Include a simulated KeyStep so the page works without hardware.
-- **Browser flasher.** The bootloader protocol is decoded ([bootloader_protocol.md](bootloader_protocol.md)),
-  so the page could flash the firmware over Web MIDI without MIDI Control Center.
+- **New MIDI Control Center.** A replacement for Arturia's MCC that only supports the KeyStep Mk1 and
+  also runs on Linux. Candidate stack: Kotlin Multiplatform with Compose Multiplatform, targeting
+  Linux, Windows, macOS (JVM desktop) and the web (Kotlin/Wasm or JS on Web MIDI). MIDI access per
+  target: `javax.sound.midi` on desktop (macOS SysEx needs CoreMIDI4J or a native bridge), Web MIDI
+  with SysEx permission in Chrome/Edge.
+  - Features: all global settings (including the ones MCC hides, see
+    [re/settings.md](re/settings.md) §2a), piano-roll editing of the 8 sequences, single-file
+    backup/restore, `.mid` import/export, a MIDI monitor, and the firmware flasher below.
+  - Holds settings for the new firmware's features, so rarely changed options (scales, chord presets,
+    generator parameters, clock divider, per-track channels) live in the app instead of on yet more
+    Shift + key combinations. The device keeps combinations only for things changed while playing.
+  - Speaks the stock SysEx protocol ([re/sysex.md](re/sysex.md)) so it also works with stock
+    firmware; new settings use the same protocol with new parameter codes.
+  - Include a simulated KeyStep so it works without hardware.
+- **Firmware flasher.** Part of the app above, on every target including the browser. The bootloader
+  protocol is decoded ([bootloader_protocol.md](bootloader_protocol.md)), so no Arturia software is
+  needed to install or restore firmware.
 - **Playable manual.** A clickable virtual KeyStep with help on each control and Shift combination.
   Shift-combo features on a screenless device are hard to discover otherwise.
 - **Stock bug catalogue.** KSCON documents stock firmware quirks and their workarounds. A
@@ -75,3 +87,84 @@ the Mk1, which has no screen.
 - **Whole-image emulation tests.** KSCON runs its firmware code in a Unicorn emulator with stubbed
   hardware calls. Complements the existing host unit tests (`Firmware/tests`) by exercising the real
   ARM build: boot, main loop, sequencer/arp timing.
+
+## From the KeyStep Pro
+
+Stock KeyStep Pro features that fit the Mk1 hardware (from memory of the Pro, not checked against its
+manual). With no screen, each needs a Shift combination or the web editor.
+
+### Sequencer
+
+- **Scale quantize.** Pick a scale and root; recorded notes, transpose and generators snap to it. Shared
+  by scale chords, Flux and the bass generator.
+- **Playback direction.** Forward, reverse, ping-pong, random. Fits on Shift + keys.
+- **Probability and randomness.** Per-step chance of playing, plus small random variation of velocity,
+  gate and pitch. A light version of Flux applied to a stored sequence.
+- **Length and time division per sequence/track.** With 16 tracks, different lengths and divisions give
+  polyrhythms. Answers the per-track vs shared question under the 16-track idea.
+- **Time shift.** Nudge the whole sequence earlier or later by a step or tick.
+- **Mute / solo per track.** Needed once there are 16 tracks; e.g. Shift + Oct + key 1–16.
+
+### Arrangement
+
+- **Chains.** Play sequences in a set order (e.g. 1 → 1 → 2 → 3) as a simple song mode. Stock only
+  switches to a chosen next sequence.
+- **Scenes.** One action recalls a combination of sequences across tracks. Only useful with 16 tracks.
+
+### Recording
+
+- **Overdub with undo.** Real-time recording that layers onto the sequence, with undo of the last take.
+  Stock only has record/replace and append.
+- **Per-track transpose.** Stock transposes the whole sequence; with 16 tracks, transpose only the
+  selected track (or exclude drum tracks).
+
+### Arpeggiator
+
+- **More modes.** E.g. a pedal-tone mode alternating a fixed note with the arp notes. (Stock already
+  has an octave range of ±3 via Shift + Oct in arp mode, see [re/arp_chord.md](re/arp_chord.md).)
+
+### Sync
+
+- **Clock divider and reset on Sync Out.** Divide or multiply the output clock (e.g. ×2, /2, /4)
+  independently of the internal step rate, and send a reset pulse on Play. Useful for Eurorack. Stock
+  only offers fixed pulse types (1 step, Korg pulse, 24/48 PPQ).
+
+## From the KeyStep mk2 / 37 mk2
+
+Checked against MCC 1.23's device definitions (`KeyStep2.json`, `KeyStep2_37.json`). The original
+KeyStep 37 (`KeyStep37.json`) has only the Mk1 settings plus four CC knobs, so scale, chord and Spice
+features come from the mk2 generation.
+
+- **Scales.** A global scale and root, overridable per pattern ("Pattern Scale": Off / Global / scale).
+  Scales: Major, Minor, Dorian, Phrygian, Lydian, Mixolydian, Locrian, Harmonic Minor, Blues,
+  Pentatonic Major/Minor, Japanese, Gypsy, Arabic, Freygish, User. Covers keyboard scale mode and scale
+  quantize (KeyStep Pro section); the list is a ready-made table to copy.
+- **Chord presets per pattern.** Oct, 5th, Maj, min, sus2, sus4, Maj7, min7, Maj9, min9, Maj11, min11,
+  or a user chord of up to 16 notes stored as signed semitone offsets ("UCO", default 0 4 7). Matches
+  root / scale chords under Playing.
+- **Strum.** Chord notes spread in time, in ms (0–500) or synced (1/64 … 1/4), with type Up, Alt Up,
+  Down, Alt Down, Random.
+- **Voicing and spread.** Voicing Off / On / Bass −1 / −2 / −3 (drop the bass note octaves); Spread
+  from velocity, aftertouch or a fixed 1–16.
+- **Spice & Dice.** Per-sequence randomisation amount ("Spice", 0–100 % in MCC). Dice (a button, not
+  in MCC) rolls a new variation of velocity, gate, octave and step on/off; the stored sequence stays
+  untouched and a roll repeats until the next Dice. Differs from per-step probability (KeyStep Pro
+  section) in that each roll is fixed and repeatable. Mk1 controls: e.g. Shift + Rate knob, Shift + Tap.
+- **Recording options.** Count-in, record quantise, record automation (controllers into the sequence).
+- **Per-pattern program change.** Bank MSB/LSB and program sent on pattern change, with a global
+  on/off. Fits "Skip redundant program changes" under MIDI.
+- **Per-pattern tempo.** "Use Patt. Tempo": Off / On / When Paused.
+- **Pattern switch timing.** "Wait to Load": At End / Instant / 1 Bar. Stock Mk1 has End / Instant
+  Reset / Instant Continue; add 1 Bar.
+- **Gate retrigger.** CV gate Mono / Legato / Legato Slide.
+- **Wheel vibrato.** Mod strip adds vibrato (depth 0–120, rate 3–100) instead of, or as well as,
+  sending CC.
+- **More mod CV sources.** Random and Pulse besides velocity, aftertouch and mod wheel.
+- **Velocity curves with fixed values.** Fixed 32 / 64 / 100 / 127 next to Lin / Log / Exp.
+- **Aftertouch sensitivity.** Low / Medium / High, on top of the curve.
+- **Expression pedal.** Pedal input as Sustain or Expression (continuous CC). Needs a hardware check:
+  the Mk1 pedal input may only read on/off.
+- **Sync types.** Separate Sync In / Sync Out types, including 4 PPQ (Sync Out: 1, 4, 24, 48 PPQ,
+  Korg). Overlaps the clock divider idea.
+- **Separate clock / transport send and receive switches**, and "Auto" clock source selection.
+- **LED intensity presets.** Dim / Normal / Night (stock Mk1 has 10–100 %).
