@@ -33,21 +33,21 @@ Other docs write "settings+0xNN": that is the object offset. In this doc, "code"
 Notes on the columns:
 - Def = value set by `settings_defaults`. Bytes it does not write default to 0 (the ctor zero-fills the object).
 - Range = the clamp applied in `settings_set` (§3). "—" means no clamp, so any byte is accepted.
-- The MCC name comes from the manual, §10.9.
+- The MCC name comes from the manual, §10.9, and from MCC 1.23's device definition `KeyStep.json` (§2a).
 
 | p | Obj | Def | Range | MCC name / meaning |
 |---|---|---|---|---|
 | 0x00–0x06 | 0x2C–0x32 | 0 | — | unused (?) |
 | 0x07 | 0x33 | 0x41 | ch / 'A' | MIDI Input Channel, used for MIDI→CV. Event 7 resets the CV voice. |
 | 0x08 | 0x34 | 0 | bool | MIDI Thru |
-| 0x09 | 0x35 | 1 | bool | Sustain Pedal Mode, Gate/Toggle (?) |
+| 0x09 | 0x35 | 1 | bool | Sustain Pedal Mode: 0 Toggle, 1 Gate |
 | 0x0A | 0x36 | 0x41 | ch / 'A' | Sustain Msg MIDI Ch |
 | 0x0B | 0x37 | 0 | — | Sustain Range Low (value sent on release) |
 | 0x0C | 0x38 | 127 | — | Sustain Range High (value sent on press) |
 | 0x0D | 0x39 | 64 | — | Sustain CC |
-| 0x0E | 0x3A | 0 | bool | Hold Switch Mode, Gate/Toggle (?) |
-| 0x0F | 0x3B | 1 | 1..3 | Sustain Pedal Function, Hold/Sustain/Both (?) |
-| 0x10 | 0x3C | 2 | 1..3 | Hold Switch Function (?) |
+| 0x0E | 0x3A | 0 | bool | Hold Switch Mode: 0 Toggle, 1 Gate |
+| 0x0F | 0x3B | 1 | 1..3 | Hold Button Function, bit 0 Hold, bit 1 Sustain CC (keyboard.md §8) |
+| 0x10 | 0x3C | 2 | 1..3 | Sustain Pedal Function, bit 0 Hold, bit 1 Sustain CC (keyboard.md §8) |
 | 0x11, 0x12 | 0x3D, 0x3E | 0 | — | unknown (?) |
 | 0x13 | 0x3F | 0x41 | ch / 'A' | Mod strip MIDI Ch |
 | 0x14 | 0x40 | 1 | — | Mod strip CC |
@@ -55,49 +55,76 @@ Notes on the columns:
 | 0x16 | 0x42 | 0 | 0..15 | User Channel (keyboard channel). Mirrored in `0x20000052`. |
 | 0x17 | 0x43 | 0x41 | ch / 'A' | "Kbd Play" channel, used only in a special UI state (see keyboard.md) (?) |
 | 0x18 | 0x44 | 2 | 0..2 | Keyboard-side flag; keyboard.md reads it as a latch flag (?) |
-| 0x19 | 0x45 | 0 | 0..5 | Velocity curve selector (keyboard.md) |
-| 0x1A | 0x46 | 0 | 0..4 | Aftertouch curve (keyboard.md) |
+| 0x19 | 0x45 | 0 | 0..5 | Velocity curve. MCC offers 0 Lin, 1 Log, 2 AntiLog; the clamp allows up to 5 (keyboard.md) |
+| 0x1A | 0x46 | 0 | 0..4 | Aftertouch curve. MCC offers 0 Lin, 1 Log, 2 AntiLog, 3 Soft; the clamp allows up to 4 (keyboard.md) |
 | 0x1B–0x1F | 0x47–0x4B | 0 | — | unused (?) |
 | 0x20 | 0x4C | 1 | 0..4 | Sync Clock type: 0 1step Gate, 1 1step Clock, 2 Korg 1 pulse, 3 24 PPQ, 4 48 PPQ |
-| 0x21 | 0x4D | 15 | 0..16 | Transpose Input channel, 16 = all (?). Event `'!'` resets the transposer to the centre note. |
+| 0x21 | 0x4D | 15 | 0..16 | Transpose Input channel, 0–15, 16 = None (MCC). Event `'!'` resets the transposer to the centre note. |
 | 0x22 | 0x4E | 3 | 2..4 | Tap Tempo average (number of taps) |
-| 0x23 | 0x4F | 0 | bool | Sync Clock Start: 0 on clock, 1 on gate/start (?) |
+| 0x23 | 0x4F | 0 | bool | Sync Clock Start: 0 On Clock, 1 On Gate Start |
 | 0x24 | 0x50 | 0 | 0..2 | Next Seq: End / Instant Reset / Instant Continue |
-| 0x25 | 0x51 | 1 | bool | Event `'%'` clears UI +0xF; seq-restart flag (?) |
-| 0x26 | 0x52 | 1 | bool | Transposition Latch (midi.md) (?) |
+| 0x25 | 0x51 | 1 | bool | Event `'%'` clears UI +0xF; seq-restart flag (?). Not exposed by MCC. |
+| 0x26 | 0x52 | 1 | bool | Transposition Latch: 0 Off, 1 On (midi.md) |
 | 0x27 | 0x53 | 1 | 1..3 | Transposition Input port, bit mask: 1 USB, 2 DIN, 3 both |
-| 0x28 | 0x54 | 0 | bool | Tempo knob mode: Jump / Pickup (?) |
+| 0x28 | 0x54 | 0 | bool | Tempo knob mode: 0 Jump, 1 Pickup |
 | 0x29 | 0x55 | 0 | bool | Velocity: As recorded / Fixed |
 | 0x2A | 0x56 | 100 | ≥1 | Fixed Velocity value |
 | 0x2B | 0x57 | 60 | — | Transpose Center Pitch |
-| 0x2C | 0x58 | 0 | sanitized ≤1 | sequencer/arp option (?) |
-| 0x2D | 0x59 | 0 | sanitized ≤1 | Wait for bar / quantised start under external clock (?) |
-| 0x2E | 0x5A | 0 | sanitized ≤1 | Tie convention, copied into new sequences at seq+0x404 |
-| 0x2F | 0x5B | 0 | sanitized ≤2 | Arp random algorithm variant (arp_chord.md) |
-| 0x30 | 0x5C | 0 | sanitized ≤1 | Record length-append overwrite mode (sequencer.md) |
+| 0x2C | 0x58 | 0 | sanitized ≤1 | sequencer/arp option (?). Not exposed by MCC. |
+| 0x2D | 0x59 | 0 | sanitized ≤1 | "Arm to Start" (MCC): 0 Off, 1 On. Code reading: wait for bar / quantised start under external clock (?) |
+| 0x2E | 0x5A | 0 | sanitized ≤1 | "Tie Mode" (MCC): 0 Tie to Previous, 1 Tie to Next. Copied into new sequences at seq+0x404 |
+| 0x2F | 0x5B | 0 | sanitized ≤2 | "Arp Random" (MCC): 0 Total, 1 Pattern, 2 Brownian (arp_chord.md) |
+| 0x30 | 0x5C | 0 | sanitized ≤1 | "Sequence Length Update" (MCC): 0 keep content beyond seq length, 1 clear it. Also read as the record length-append overwrite mode (sequencer.md) |
 | 0x31–0x45 | 0x5D–0x71 | 0 | — | unused (?) |
 | 0x46 | 0x72 | 0 | bool | Pitch CV output: 0 V/oct, 1 Hz/V |
-| 0x47 | 0x73 | 2 | 0..2 | Gate type: 0 S-trig, 1 V-trig 5 V, 2 V-trig 12 V (?) |
+| 0x47 | 0x73 | 2 | 0..2 | Gate type: 0 S-trig, 1 V-trig 5 V, 2 V-trig 12 V |
 | 0x48, 0x49 | 0x74, 0x75 | 0 | — | unused (?) |
 | 0x4A | 0x76 | 0 | — | V/oct "0 V note" |
 | 0x4B | 0x77 | 0 | — | unused (?) |
 | 0x4C | 0x78 | 24 | — | Hz/V "1 V note" (24 = C0) |
 | 0x4D | 0x79 | 2 | 0..2 | Note Priority: 0 Low, 1 High, 2 Last (keyboard only) |
-| 0x4E | 0x7A | 0 | 0..2 | Mod CV source: 0 mod strip / CC1, 1 velocity (?), 2 aftertouch |
-| 0x4F | 0x7B | 5 | 1..12 | Mod CV max, in volts (range in mV = value × 1000) |
+| 0x4E | 0x7A | 0 | 0..2 | Mod CV source: 0 mod strip / CC1, 1 velocity, 2 aftertouch |
+| 0x4F | 0x7B | 5 | 1..12 | Mod CV max, in volts (range in mV = value × 1000). MCC offers 5–12 V. |
 | 0x50 | 0x7C | 2 | 1..24 | Pitch bend range in semitones. Also settable via RPN 0. |
 | 0x51–0x5F | 0x7D–0x8B | 0 | — | unused (?) |
 | 0x60 | 0x8C | 1 | 0..3 | Transport Mode: bit0 MIDI CC, bit1 MMC |
 | 0x61 | 0x8D | 0x41 | ch / 'A' | Stop channel |
 | 0x62 | 0x8E | 0x41 | ch / 'A' | Record channel |
 | 0x63 | 0x8F | 0x41 | ch / 'A' | Play channel |
-| 0x64 | 0x90 | 51 | — | Stop CC (?) |
+| 0x64 | 0x90 | 51 | — | Stop CC |
 | 0x65 | 0x91 | 50 | — | Record CC |
-| 0x66 | 0x92 | 54 | — | Play CC (?) |
-| 0x67 | 0x93 | 0 | bool | Play/Pause button = Pause or Reset (?) |
-| 0x68–0x6A | 0x94–0x96 | 0 | bool | unknown flags (?) |
+| 0x66 | 0x92 | 54 | — | Play CC |
+| 0x67 | 0x93 | 0 | bool | Play/Pause button: 0 Pause, 1 Reset |
+| 0x68–0x6A | 0x94–0x96 | 0 | bool | unknown flags (?). Not exposed by MCC. |
 | 0x6B | 0x97 | 100 | 10..100 | LED brightness in %. Event `'k'`. |
 | 0x6C–0x7F | 0x98–0xAB | 0 | — | unused, apart from 0x7D = +0xA9 test mode |
+
+## 2a. MCC device definition
+
+MIDI Control Center 1.23 describes the KeyStep in `Resources/KeyStep.json` (not in the repo; it is
+in Arturia's installer). Each global setting there has `paramId` 65 (0x41, the "global setting"
+address byte in sysex.md) and `globalParamId` = `p`. The names, value lists and conditions in the
+table above come from it.
+
+- **Not exposed by MCC:** 0x17, 0x18, 0x25, 0x2C, 0x68–0x6A. Only the firmware (or SysEx) can change
+  them.
+- **MCC defaults that differ from `settings_defaults`.** MCC's `defaultValue` is what its editor shows
+  for a new template; the device itself resets to the firmware value.
+
+  | p | Setting | Firmware | MCC |
+  |---|---|---|---|
+  | 0x20 | Sync Clock type | 1 (1 step Clock) | 0 (1 step Gate) |
+  | 0x28 | Tempo knob mode | 0 (Jump) | 1 (Pickup) |
+  | 0x4D | Note Priority | 2 (Last) | 0 (Low) |
+  | 0x50 | Pitch bend range | 2 | 1 |
+  | 0x60 | Transport Mode | 1 (CC) | 3 (Both) |
+
+- **Sequence fields** use `paramId` 96–102 (0x60–0x66, see sysex.md): 96 length (1–64), 97 swing
+  (50–75), 98 gate (10/25/50/75/90), 99 step tie, 101 note velocity, 102 note pitch. 100 is not used
+  by MCC. MCC's factory template `Default.keystep` holds only these: 8 sequences of length 16,
+  swing 50, gate 50, all steps empty.
+- Device identity: USB VID 0x1C75, app PID 648 (0x0288), manufacturer ID `00 20 6B`, family `02 00`,
+  member `08 00`, protocol "arturia_v2". The updater entry is in [../bootloader_protocol.md](../bootloader_protocol.md).
 
 ## 3. Clamp rules in `settings_set`
 
@@ -199,13 +226,13 @@ Result: settings return to defaults on this same boot (load runs afterwards), wh
 
 | Byte | Meaning | Default if erased |
 |---|---|---|
-| 0x0803F200 | Pitch strip calibration A (?) | 0xBF |
-| 0x0803F201 | Pitch strip calibration B (?) | 0x09 |
-| 0x0803F202 | Mod strip calibration A (?) | 0xBF |
-| 0x0803F203 | Mod strip calibration B (?) | 0x09 |
+| 0x0803F200 | Pitch strip high end (raw) | 0xBF |
+| 0x0803F201 | Pitch strip low end (raw) | 0x09 |
+| 0x0803F202 | Mod strip high end (raw) | 0xBF |
+| 0x0803F203 | Mod strip low end (raw) | 0x09 |
 
 - **Load** (`touchstrip_cal_load` 0x08015eb8): if byte 0x0803F200 is 0xFF, the defaults are used for both strips. Otherwise bytes 0/1 go to the pitch strip object `0x200000B0` and bytes 2/3 to the mod strip object `0x200000B4`, through setters 0x080111e2 / 0x080111de.
-- The two values are probably the raw max/min ADC bytes of the strip (0xBF ≈ top, 0x09 ≈ bottom) (?).
+- The values are the raw controller positions at the top and bottom of the strip, captured by the MCC calibration (sysex.md §5.6).
 - **Calibration procedure**: driven over SysEx by MCC (sysex.md §5.6). When both strips report done (0x080111e6), 0x08015f24 marks bit 9 dirty and the page is rewritten as in §5.
 
 ## 8. Other flash locations

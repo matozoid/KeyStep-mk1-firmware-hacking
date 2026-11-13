@@ -100,8 +100,8 @@ Probably a legacy/compat switch between two firmware generations (?).
 | 7 | 40 | 1/32T |
 
 A division change is queued and applied only when the global tick counter (0x20000090) is a
-multiple of the new T, so the grid stays phase-aligned. Mapping of the knob positions to indices
-not checked (?).
+multiple of the new T, so the grid stays phase-aligned. The knob position is the index itself
+(timediv_knob_process 0x0801307c; detent windows in hardware_map.md).
 
 ### 2.3 Step, swing, gate
 
@@ -145,7 +145,7 @@ Gate-off tick (`g` = hdr+0x402):
 - Current transpose key at 0x20000058; −1 = none. Reset to the centre when entering seq mode,
   when changing sequence and when entering record.
 - Set from the keyboard while playing (and from MIDI input on a configurable channel/port,
-  settings+0x4D/+0x4E (?)).
+  settings+0x4D channel, +0x53 port mask).
 
 ### 2.6 Next Seq (settings+0x50)
 
@@ -224,7 +224,7 @@ counters, Tap state, real-time buffer, current/next sequence pointers).
 
 - Tempo: BPM×100 stored at clock+0x0E, applied via the TIM2 formula above.
 - Clock source (clock+0x0C): 0 internal, 1 MIDI/USB (?), 2 Sync In.
-- MIDI clock out: 0xF8 every 20 ticks (24 PPQN); LED 6 blinks on beat (on at 12, off at 24 clocks).
+- MIDI clock out: 0xF8 every 20 ticks (24 PPQN); the Tap LED (bit 6) is lit for the first 12 clocks of each beat and dark for the other 12.
 - Sync Out pulse spacing (settings+0x4C), 50 % duty:
 
 | Setting | Ticks per pulse | Notes |
@@ -238,7 +238,7 @@ counters, Tap state, real-time buffer, current/next sequence pointers).
 - External sync: each incoming pulse is expanded to `ticksPerPulse − alreadyInterpolated + 1`
   ticks, so the internal 480 PPQN keeps running between pulses and catches up.
 - Tap tempo: a period is measured and converted to BPM; the tempo knob pickup accepts the range
-  30.00..240.00 BPM. Averaging depth is probably settings+0x53 (1..3) (?). Jump vs. Pickup is
+  30.00..240.00 BPM. Averaging depth is settings+0x4E (2..4 taps, per the clamp rules in settings.md). Jump vs. Pickup is
   probably settings+0x54 (?). Not decoded in detail.
 
 ## 5. Settings bytes used by the sequencer
@@ -248,25 +248,24 @@ Offset = settings base 0x20005058 + 0x2C + SysEx parameter id (?).
 | Offset | Meaning |
 |---|---|
 | +0x4C | Sync Out type |
-| +0x4D / +0x4E | Transpose input channel / port (?) |
+| +0x4D | Transpose input channel (16 = all) |
+| +0x4E | Tap tempo average, 2..4 taps |
 | +0x50 | Next Seq mode |
 | +0x51 | Record/restart related flag (?) |
-| +0x53 | Tap average count 1..3 (?) |
-| +0x54 | Tempo knob mode (?) |
+| +0x53 | Transpose input port mask: 1 USB, 2 DIN, 3 both |
+| +0x54 | Tempo knob mode: Jump / Pickup (?) |
 | +0x55 / +0x56 | Fixed-velocity enable / value |
 | +0x57 | Transpose centre note |
-| +0x59 | Wait-for-bar / quantised start under external clock (?) |
-| +0x5A | Tie convention for new sequences |
-| +0x5C | Length append overwrite mode |
+| +0x59 | MCC "Arm to Start"; wait-for-bar / quantised start under external clock (?) |
+| +0x5A | MCC "Tie Mode" (Tie to Previous / Next), copied into new sequences |
+| +0x5C | MCC "Sequence Length Update" (keep / clear content beyond length); length append overwrite mode |
 | +0x8C bit1 | Send transport messages |
 | +0x93 | Play/Pause acts as reset (?) |
 
-Defaults could not be read: settings live in zero-initialised RAM and the RW data in the scatter
-table (0x0801ACD4) is compressed.
+Defaults and clamp ranges are in [settings.md](settings.md).
 
 ## 6. Open questions
 
-- Knob position → division index mapping (timediv_knob_process 0x0801307c).
 - Tap-tempo averaging and Jump/Pickup (around 0x080123b8–0x080134d8, object 0x200017E0).
 - Exact meaning of settings+0x51, +0x59, +0x93 and the 0x20000063 flag.
 - The flash-writer buffer quirk in 1.5.

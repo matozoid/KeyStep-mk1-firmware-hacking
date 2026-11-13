@@ -97,7 +97,7 @@ the clock position on first use. Index pick = `((x>>27)+1) mod n`; random
 octave / walk direction use bits 20–21.
 
 The random algorithm has three variants, selected by settings byte
-0x20005058+0x5b (0..2; MCC parameter name and default unknown (?)):
+0x20005058+0x5b (p 0x2F, MCC "Arp Random": 0 Total, 1 Pattern, 2 Brownian; default 0):
 
 | Variant | Behaviour |
 |---|---|

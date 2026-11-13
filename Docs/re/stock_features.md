@@ -6,7 +6,7 @@ Hardware details are in [hardware_map.md](hardware_map.md).
 
 ## Keyboard and controls
 
-- 32 keys, velocity (3 curves: Log / Lin / AntiLog) and channel aftertouch (3 curves).
+- 32 keys, velocity (3 curves: Log / Lin / AntiLog) and channel aftertouch (MCC offers Lin / Log / AntiLog / Soft, see [settings.md](settings.md)).
 - Oct− / Oct+: ±4 octaves, buttons flash faster the further from centre; both together = centre.
   Shift takes effect on the next note played.
 - Pitch strip: springs back to centre, dead zone in the middle. Mod strip: stays where released,

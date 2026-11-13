@@ -13,7 +13,7 @@ in the application image (linked at `0x08004000`). Function names are the ones i
 | Bootloader | `0x08000000–0x08003FFF` (Arturia, SysEx updater) | |
 | Application | `0x08004000`, VTOR set in SystemInit | vector table |
 | Clock | HSE 8 MHz × 9 = 72 MHz, APB1 /2, flash latency 2, USB 48 MHz | `SystemClock_Config` 0x0800cd94 |
-| SysTick | 1 kHz software timers, LED blink | 0x08009d44 |
+| SysTick | 10 kHz (100 µs tick, counter at 0x20000070): software timers, key velocity timing, LED blink | 0x08009d44 |
 | Watchdog | IWDG, reload 0xFFF | 0x08009600 |
 
 ## Flash layout used by the app
@@ -22,11 +22,12 @@ in the application image (linked at `0x08004000`). Function names are the ones i
 |---|---|---|---|
 | `0x0803B000 + n*0x800`, n=0..7 | 8 × 2 KB | 8 sequences (RAM copies at `0x200022C8 + n*0x408`) | `seq_flash_is_empty` 0x08015c08, `seq_flash_erase_all` 0x08015bd0 |
 | `0x0803F000` | 0x80 bytes | global settings → RAM `0x20005084` | 0x08015cd0 |
-| `0x0803F200` | 4 bytes | touch-strip calibration (min/max for pitch & mod strip; default 0xBF/0x09) | 0x08015eb8 |
+| `0x0803F200` | 4 bytes | touch-strip calibration: pitch hi, pitch lo, mod hi, mod lo (default 0xBF/0x09) — see [settings.md](settings.md) §7 | 0x08015eb8 |
 | `0x0803F800` | 8 bytes | bootloader request flag `0xA33A95FF, 0xAAA55A55`, written by SysEx `'&'` (?) | 0x08015c80 |
 
-Holding both octave buttons at power-on is the factory reset (manual 3.1.7: resets everything). The code
-erases the sequence pages there (`main` 0x0800c1f4); whether settings are also reset is not yet traced.
+Holding both octave buttons at power-on is the factory reset (manual 3.1.7: resets everything). It
+erases the sequence pages and rewrites the settings page with an erased first word, so settings return
+to defaults while the touch calibration survives ([settings.md](settings.md) §6).
 
 ## Pins
 
@@ -58,9 +59,9 @@ Button objects (ctor 0x0800f9d2, handler press 0x0800f3a0 / release 0x0800f7f0, 
 | 0 | 0x2000129C | 2 | Hold; Shift+Hold = Chord mode. LED 2 is also driven by the sustain pedal |
 | 1 | 0x200012D0 | 7 | Shift (flag 0x2000005F; knob changes deferred until release, manual 4.3.4) |
 | 2 | 0x20001304 | 4 | Oct − (flag 0x2000005E); Shift+Oct− = Transpose mode |
-| 3 | 0x20001338 | — (?) | Oct + (flag 0x2000005D); Shift+Oct+ = Kbd Play mode |
-| 4 | 0x2000136C | 6 | Record; Shift+Rec = append |
-| 5 | 0x200013A0 | — (?) | Tap tempo / Rest / Tie |
+| 3 | 0x20001338 | 3 | Oct + (flag 0x2000005D); Shift+Oct+ = Kbd Play mode |
+| 4 | 0x2000136C | 6 | Tap tempo / Rest / Tie (press handler feeds the tap object 0x200000FC, or enters a rest in step record) |
+| 5 | 0x200013A0 | 5 | Record (ui_button_event case 5 toggles the record state); Shift+Rec = append |
 | 6 | 0x200013D4 | 0 | Stop (3 presses → CC 123 All Notes Off on all 16 channels); Shift+Stop = clear last step |
 | 7 | 0x20001408 | 1 | Play/Pause; Shift+Play = restart |
 
@@ -68,9 +69,9 @@ Button objects (ctor 0x0800f9d2, handler press 0x0800f3a0 / release 0x0800f7f0, 
 
 | Function | Pins | Evidence |
 |---|---|---|
-| Sync source selector: Internal / USB / MIDI / Sync In (both down = Internal) | PE2, PE3 (2-bit, inverted) | 0x08018a46, 0x08018994 → clock `set_source` 0x0800e5d0 |
-| Seq / Arp mode switch | PE4 | 0x08011cb4 → `ui_set_seq_arp` 0x08014070 |
-| PD4 (?) | PD4 | 0x0800f20c, only changes LED fade mode — power/USB detect (?) |
+| Sync source selector. Code = ~(PE3 \| PE2 << 1) & 3: 0 Internal, 1 USB, 2 Sync In, 3 MIDI | PE2, PE3 (2-bit, inverted) | 0x08018a46, 0x08018994 → clock `set_source` 0x0800e5d0 |
+| Seq / Arp mode switch: high = Seq, low = Arp | PE4 | 0x08011cb4 → `ui_set_seq_arp` 0x08014070 |
+| LED level select (?) | PD4 | 0x0800f20c. High: LEDs at 90 % of the brightness setting; low: 20 %, with a short fade between the two. What drives it is unknown (power/USB detect?) |
 
 ### Analog inputs (ADC1, 5-channel scan, DMA1 ch1)
 
@@ -84,12 +85,50 @@ Button objects (ctor 0x0800f9d2, handler press 0x0800f3a0 / release 0x0800f7f0, 
 
 ADC init 0x080092a0, handle `0x200004D8`, sampler object `0x2000114C`.
 
+Both detent knobs share one decoder (0x080118e2). The raw reading is matched against fixed windows,
+which are not evenly spaced:
+
+| Position | Raw window |
+|---|---|
+| 7 | 0x173–0x239 |
+| 6 | 0x317–0x3DD |
+| 5 | 0x4AA–0x570 |
+| 4 | 0x647–0x70D |
+| 3 | 0x808–0x8CE |
+| 2 | 0xA0B–0xAD1 |
+| 1 | 0xC7B–0xD41 |
+| 0 | ≥ 0xF9C |
+| 8 (none) | anything else |
+
+A position counts only after 18 equal readings in a row (0x08011a04). Position 8 is ignored by
+both knob handlers. The time-division position is used directly as the division index
+(sequencer.md 2.2); the mode-knob position is the sequence or arp mode index.
+
 ### Touch strips (I2C)
 
 Two identical capacitive touch controllers, 8-bit I2C address `0x2A` (7-bit `0x15`), one per bus,
-100 kHz. Init writes registers 0xAF, 0x1F, 0x00–0x10, 0xE0–0xF2, 0x70–0xA8, 0xF3 from table
-`0x08019D60` (0x0800d020 / 0x0800cbdc); position read 0x080111ec; scaled 0..127 via calibration
-(0x08011192). Bus is recovered with 64 SCL pulses on failure (0x08011250).
+100 kHz. Bus is recovered with 64 SCL pulses on failure (0x08011250).
+
+Set-up (0x0800d184 = init 0x0800d020 + verify 0x0800cbdc + enable), single-byte register writes,
+values from the table at `0x08019D60`:
+
+| Step | Register ← value |
+|---|---|
+| 1 | 0xAF ← 0x3A, 0x1F ← 0x00 |
+| 2 | 0x00..0x0F ← 0x00..0x0F (identity), 0x10 ← 0x06 |
+| 3 | 0xE0..0xF2 ← 0x00 |
+| 4 | 0x70..0xA8 ← 0x00 |
+| 5 | 0xF3 ← 0x55 |
+| 6 (verify) | 0x11 ← 0x00, 0x12 ← 0x08, 0x13 ← 0x00, 0x14 ← 0x3F, 0x15 ← 0, 0x16 ← 0, 0x1D ← 0, 0x1E ← 0x7F |
+| 7 (enable) | 0xAF ← 0x3A, 0x1F ← 0x01 |
+
+Writing 0x1F ← 0x10 and polling until it reads 0 is an optional calibrate step.
+
+Position: one byte from register 0x21, read by an 8-step non-blocking state machine
+(0x0800ca82, one step per main-loop pass); raw 0 = not touched. Scaling (0x08011192):
+`s = clamp(((raw − lo)·0x7F0 / (hi − lo)) >> 4, 0, 127)` with calibration lo/hi
+(`0x0803F200`: byte 0 → hi, byte 1 → lo; defaults hi 0xBF, lo 0x09). Strip behaviour is in
+[keyboard.md](keyboard.md) §9–10.
 
 | Bus | Pins | Function | Consumer |
 |---|---|---|---|
@@ -118,16 +157,29 @@ channel 1 (PA4); verify on hardware.
 | Sync out clock | PB8 | |
 | Sync out start/stop | PD2 | |
 
-Sync object `0x20001134` (ctor 0x080150e6). Clock type from settings+0x4C (0x0800e96c). The value is
-internal ticks per pulse at 192 PPQN: cases 0–4 → 48 / 8 / 4 / 48 / 96. So 1 = 24 PPQ, 2 = 48 PPQ;
-0, 3, 4 are the step types (manual: 1 step Gate, 1 step Clock, 1 pulse Korg; default 1 step Clock),
-exact order unconfirmed. Sync start mode settings+0x4F: On Clock / On Gate Start (TRS ring).
+All four lines are active low at the GPIO. At boot and on stop both outputs are driven high; on
+start the start/stop output goes low (transport handler 0x0800e01c, init 0x080150b0). The clock input handler acts
+when the pin reads 0 after an edge, and the start/stop input means Play when it reads 0 and Stop
+when it reads 1 (EXTI3 handler). The thru path copies each input pin level to its output pin.
+
+Sync object `0x20001134` (ctor 0x080150e6). Clock type from settings+0x4C (0x0800e96c):
+0 1 step Gate, 1 1 step Clock (default), 2 Korg, 3 24 PPQ, 4 48 PPQ, i.e. 20 / 120 / 240 / 20 / 10
+ticks of the 480 PPQN clock per pulse (see [sequencer.md](sequencer.md) §4 and
+[settings.md](settings.md)). Sync start mode settings+0x4F: On Clock / On Gate Start (TRS ring).
 
 ### LEDs
 
 8 LEDs on a serial-in shift register: SPI2 (PB13 SCK, PB15 MOSI, master, /16, 1 byte),
 latch **PB12**, PB14 held high at init (shift register reset/OE (?)). Global brightness = PWM on
-**PC9 (TIM3_CH4)** driving the shift register OE (settings+0x97, 10–100 %).
+**PC9 (TIM3_CH4)** driving the shift register OE (settings+0x97, 10–100 %). PWM mode 1 with a
+0..255 period; CCR = percent × 255 / 100, so more high time is brighter (`leds_set_brightness_pct` 0x08013b12).
+The shift-register bits are active low: 0 lights the LED. Evidence: the octave LED object is
+built with LEDs 3 (Oct+) and 4 (Oct−) (0x08018d8a), and at octave 0 it writes 1 to both, so both
+are dark. Shift+Oct− (Transpose) writes 0 to bit 4 and 1 to bit 3, and the manual says Oct− lights
+and Oct+ goes dark. Bit 6 (Tap) lights on transport start and blinks with the beat (lit for the first 12 MIDI clocks).
+Bit 5 (Rec) lights when recording starts, follows the steps while recording, and goes dark when
+the mode switch selects Arp. The LED numbers come from `button_ctor` (id, led): Tap is built with
+LED 6; the Record button passes no LED and its handler drives bit 5 directly.
 Driver object `0x20000F88`: ctor 0x08013dd8, set bit 0x08013ae8, flush 0x08013da4, blink scheduler 0x08013b54.
 
 ### MIDI / USB
@@ -135,7 +187,7 @@ Driver object `0x20000F88`: ctor 0x08013dd8, set bit 0x08013ae8, flush 0x08013da
 | Item | Value |
 |---|---|
 | DIN MIDI | USART1 PA9 TX / PA10 RX, 31250 baud, IRQ 0x0800a440 (RX → parser 0x08012906) |
-| USB | FS device, MIDI class, EP 0x81 IN / 0x02 OUT, D+ pull-up switched by PA8 |
+| USB | FS device, MIDI class, EP 0x81 IN / 0x02 OUT, D+ pull-up switched by PA8 (high = connected) |
 | Output router | singleton `0x20000258` (0x08019b0c); `midi_out_usb` 0x080169c4 (ring of 36), `midi_out_din` 0x080166c8 |
 
 ### Unused / analog-parked pins

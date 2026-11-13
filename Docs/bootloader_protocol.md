@@ -24,6 +24,21 @@ KeyStep → Host   F0 1A F7                     ACK after each frame
 KeyStep → Host   F0 77 F7                     final ACK
 ```
 
+### What MCC knows about the updater
+
+MCC 1.23's device definition (`Resources/KeyStep.json`, see [re/settings.md](re/settings.md) §2a)
+names the updater "midiplus" and gives:
+
+| Field | Value |
+|---|---|
+| `updaterUsbVendorId` / `updaterUsbProductId` | 7285 / 520 (`1c75:0208`, matches the table above) |
+| `firmwareFilePattern` | `*.led` |
+| `productCode` | 63 (0x3F; probably the byte in the KeyStep's reply `F0 3F F7` (?)) |
+| `productKey` | 90 87 110 40 60 78 63 = `5A 57 6E 28 3C 4E 3F`, the handshake payload |
+| `minimalVersionRequired` | 1.0.0.5 |
+
+MCC 1.23 bundles `keystep_Firmware_Update_1.1.0.28.led`, byte-identical to `vendor/keystep_1_0_28.led`.
+
 ## `.led` file format
 
 The file is ASCII hex. Decoded, it is a sequence of frames (2078 bytes each):

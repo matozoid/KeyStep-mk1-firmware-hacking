@@ -95,7 +95,7 @@ Buttons (button_on_press 0x0800f3a0). Flags: Oct+ held is 0x2000005D, Oct− hel
 - The change takes effect on the next note-on. Held notes keep their stored octave.
 
 LEDs (0x08018c42):
-- 0 → both Oct LEDs on.
+- 0 → both Oct LEDs dark (the LED bits are active low, see hardware_map.md).
 - |v| = 1/2/3/4 → the LED on that side blinks at period index 6/4/2/1, faster for larger shifts. The other LED is off.
 
 Shift + Oct in **Arp** mode adjusts a second octave-like object, 0x200016D0 (pointer at 0x200000D0, limit 3). Its value is pushed to the arpeggiator (arp+0x14 through 0x0800d550): the arp octave range −3..+3, stepped once per pattern loop. See arp_chord.md.

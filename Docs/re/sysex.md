@@ -34,7 +34,7 @@ How the parser lays out the rest of the message:
 | cmd | After `b7` |
 |---|---|
 | 0x05, 0x06, 0x1C | nothing; the message ends after `b7` |
-| 0x0B, 0x0C (sequence block) | `b8`, then a count n (0..3), n index bytes, a length L (≤100), then L data bytes |
+| 0x0B, 0x0C (sequence block) | `b8`, then a count c (0..3), **c + 1** index bytes, a length L (clamped to 100), then (0x0C only) L data bytes |
 | 0x20/0x21 | `b8`, idx, then 1 extra index |
 | 0x22/0x23 | `b8`, idx, then 2 extra indices |
 | 0x24/0x25 | `b8`, idx, then 3 extra indices |
@@ -66,7 +66,7 @@ ACK (`sysex_send_ack` 0x0801174c): `F0 00 20 6B 7F 42 1C 00 F7`.
 | 0x0B | host→dev | get, 0x080114cc | Sequence block read, reply cmd 0x0C |
 | 0x0C | both | `seq_block_write` 0x0801137c | Sequence block write / block reply |
 | 0x1C | dev→host | — | ACK |
-| 0x20/0x22/0x24 | host→dev | get | Multi-index get, reply 0x21/0x23/0x25 |
+| 0x20/0x22/0x24 | host→dev | get | Multi-index get. The reply echoes the request (same cmd, same indices) with **no value**, then an ACK: there is no single-value sequence read |
 | 0x21/0x25 | both | `seq_param_set` 0x080115bc | Set one sequence value |
 | 0x23 | both | 0x080120c4 | Note preview (§5.5) |
 | 0x26 | internal | 0x080120c4 | Bootloader request, §6 |
@@ -128,45 +128,59 @@ A get with `b8 < 0x40` replies with value 0.
 
 `settings_test_flag_set` 0x08018588 has a bug: clearing a flag ANDs with the mask instead of with its inverse, so it clears all the other flags too.
 
-### 5.5 Note preview (?)
+### 5.5 Note preview
 
 | Frame | Effect |
 |---|---|
-| `02 7D 7A 06 <note>` | Note-on, velocity 0x40, sent to the CV voice |
-| `23 7D 7A 06 <x> <note> <vel>` | Note-on with an explicit velocity |
+| `02 7D 7A 06 <note>` | Note event on the CV voice, velocity 0x40 |
+| `23 7D 7A 06 <x> <note> <vel>` | Note event with an explicit velocity (idx[1] `x` unused) |
+
+Both build a note event and hand it to the CV voice, the same path MIDI-to-CV uses. Our firmware
+treats velocity 0 as a release; whether the stock voice does the same is not confirmed (?).
 
 ### 5.6 Touch-strip calibration (cmd 0x08)
 
-| Frame | Effect |
-|---|---|
-| `08 40 32` with idx 0x41 | Run a calibration step on the pitch strip (0x08011234) |
-| `08 40 32` with idx 0x40 | Same for the mod strip |
-| `08 40 33 …` | Second calibration step, 0x0801122a (?) |
+Frame: `08 40 <step> <strip>`, strip 0x41 = pitch, 0x40 = mod. No reply.
 
-When both strips report done (0x080111e6), the calibration is saved to `0x0803F200` (settings.md §7).
+Each strip object keeps the last raw position, a captured value and a done flag:
+
+| step (b8) | Handler | Effect |
+|---|---|---|
+| `'3'` (0x33) | 0x0801122a | Clear the done flag; capture the current raw position (the low end) |
+| `'2'` (0x32) | 0x08011234 | If the current position is non-zero it becomes the **high** value (calibration byte 0/2); if a capture exists it becomes the **low** value (byte 1/3). Either sets the done flag |
+
+After a `'2'`, if both strips are done (0x080111e6 reads the flag), 0x08015f24 marks the settings page dirty and the calibration is written to `0x0803F200` with the next save (settings.md §7). The flags are not cleared afterwards. So MCC asks the user to hold the bottom of each strip (`'3'`), then the top (`'2'`).
 
 ## 6. Sequence transfer
 
-Index bytes: `[0]` = 1, `[1]` = sequence 1–8, `[2]` = step 0–63, `[3]` = note slot 0–7. Commands use as many of these as they need (?).
+Request fields after `b8`, as laid out by the parser: idx[0] is always 1, idx[1] is the sequence **1–8**, idx[2] the step **1–64**, idx[3] the note slot **1–8**. All indices are 1-based.
 
-| b8 | Field | Sequence RAM |
-|---|---|---|
-| 0x60 | Length | +0x400 |
-| 0x61 | Swing (?) | +0x401 |
-| 0x62 | Gate length (?) | +0x402 |
-| 0x63 | Tie bits; one 32-flag block (?) | — |
-| 0x65 | Note pitches | step × 16 + slot × 2 |
-| 0x66 | Velocities (?) | step × 16 + slot × 2 + 1 |
+Field codes (b8):
 
-A sequence is 0x408 bytes: 64 steps × 8 slots × (note, velocity), then +0x400 length, +0x401, +0x402 and the flags at +0x403. In a slot, note 0xFF = empty and 0x82 = rest. See sequencer.md.
+| b8 | Field | Block read (0x0B) | Block write (0x0C) |
+|---|---|---|---|
+| 0x60 | Length | data[0] = length | length = data[0] |
+| 0x61 | Swing | data[0] = swing | swing = data[0] |
+| 0x62 | Gate | data[0] = gate | gate = data[0] |
+| 0x63 | Tie flags of 32 steps from idx[2] | data[i] = 1 if the step's slot 0 has the tie bit and is not empty | slot 0 velocity byte **replaced** by 0x80 (tie) or 0 |
+| 0x65 | Velocities of the 8 slots of step idx[2] | data[i] = velocity & 0x7F, or 0 for an empty/rest slot | slot 0: velocity added to the existing (tie) byte; slots 1–7: velocity stored |
+| 0x66 | Notes of the 8 slots of step idx[2] | data[i] = note & 0x7F | a slot with velocity 0 becomes empty, except slot 0 inside the length, which becomes a rest (0x82); other slots take the note |
 
-| Op | Frame | Handler |
-|---|---|---|
-| Block read | `0B <b7> <b8> <n> <idx…>`, reply `0C … <len> <data…>` | 0x080114cc |
-| Block write | `0C <b7> <b8> <n> <idx…> <len> <data…>` (len ≤ 100) | 0x0801137c |
-| Single value | `21`/`25 <b7> <b8> <idx…> <value>` | 0x080115bc |
+Because a tie write clears velocities and a note write depends on them, MCC must write in the order tie flags → velocities → notes for each block of steps. The block reply is `0C <b7> <b8> <c> <idx…> <L> <data…>` followed by an ACK. A block write is ACKed.
 
-After a sequence change, the sequence is marked dirty with a 10 s debounce, and its flash page is rewritten (settings.md §5).
+Single-value set (`21` with idx[0..1], `25` with idx[0..3]), handler `seq_param_set` 0x080115bc. The value is one byte.
+
+| b8 | Effect |
+|---|---|
+| 0x60 | When the length grows, empty slot-0 steps between the old and new length become rests. Then the length is set |
+| 0x61 / 0x62 | Swing / gate |
+| 0x63 | Tie bit of slot 0 set (value 1) or cleared |
+| 0x65 | Velocity. A value of 0 first empties the slot (slot 0 inside the length becomes a rest). Slot 0 keeps its tie bit |
+| 0x66 | Note. If the slot's velocity is 0, the stock code writes velocity 0x7F (slot 0) or 0xFF (other slots) and does **not** store the note (?) |
+
+Every block write and single set marks the sequence dirty (flags bit 1) and starts the 10 s save timer (settings.md §5).
+
+A sequence is 0x408 bytes: 64 steps × 8 slots × (note, velocity), then +0x400 length, +0x401 swing, +0x402 gate and the flags at +0x403. In a slot, note 0xFF = empty and 0x82 = rest. See sequencer.md.
 
 ## 7. Universal messages
 

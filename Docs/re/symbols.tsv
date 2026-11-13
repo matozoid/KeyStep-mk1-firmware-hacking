@@ -1,30 +1,31 @@
-0x08009d44	SysTick_Handler
-0x08008ee4	HardFault_Handler
-0x080047c4	FLASH_IRQHandler
+0x080041d4	scatterload_and_ctors
+0x080042fc	scatter_decompress	RW data LZ decompressor
+0x08004520	DMA1_Channel1_IRQHandler	ADC1 DMA
 0x0800455c	EXTI0_IRQHandler	sync in clock PD0
 0x08004738	EXTI3_IRQHandler	sync in start/stop PD3
-0x08004520	DMA1_Channel1_IRQHandler	ADC1 DMA
-0x0800bd98	USB_HP_CAN1_TX_IRQHandler
-0x0800bda8	USB_LP_CAN1_RX0_IRQHandler
-0x08009f08	TIM2_IRQHandler	internal clock
-0x08009f58	TIM4_IRQHandler
-0x0800a440	USART1_IRQHandler	DIN MIDI
-0x080041d4	scatterload_and_ctors
+0x080047c4	FLASH_IRQHandler
+0x080050c0	HAL_DAC_Start
+0x08005b7c	HAL_FLASHEx_Erase
+0x08005c2c	HAL_FLASHEx_Erase_IT
+0x08005e08	HAL_FLASH_Lock
+0x08005e20	HAL_FLASH_Program
+0x08005ed0	HAL_FLASH_Program_IT
+0x08005f4c	HAL_FLASH_Unlock
 0x08005f78	HAL_GPIO_DeInit
 0x080060d0	HAL_GPIO_Init
 0x08006410	HAL_GPIO_ReadPin
 0x08006420	HAL_GPIO_WritePin
-0x08006714	HAL_I2C_Mem_Write
 0x080064e8	HAL_I2C_Mem_Read
+0x08006714	HAL_I2C_Mem_Write
+0x08006b88	HAL_PCD_DataOutStageCallback	USB RX to ring, re-arm EP 0x02
 0x08006e78	HAL_PCD_IRQHandler
 0x08007a8c	HAL_RCC_OscConfig
-0x080050c0	HAL_DAC_Start
 0x08008baa	HAL_TIM_PWM_ConfigChannel
 0x08008d50	HAL_TIM_PWM_Start
-0x0800cd94	SystemClock_Config
-0x08009388	MX_GPIO_Init
+0x08008ee4	HardFault_Handler
 0x080092a0	MX_ADC1_Init	5 ch PC0-PC4
 0x08009328	MX_DAC_Init
+0x08009388	MX_GPIO_Init
 0x08009590	MX_I2C1_Init
 0x080095c8	MX_I2C2_Init
 0x08009600	MX_IWDG_Init
@@ -33,92 +34,295 @@
 0x080096b0	MX_TIM3_Init	pitch CV PWM CH1/CH2, LED OE CH4
 0x08009710	MX_TIM4_Init
 0x0800975c	MX_USART1_Init	31250 baud
-0x08019538	app_objects_ctor
+0x08009d44	SysTick_Handler
+0x08009f08	TIM2_IRQHandler	internal clock
+0x08009f58	TIM4_IRQHandler
+0x0800a440	USART1_IRQHandler	DIN MIDI
+0x0800a528	usbmidi_class_deinit
+0x0800a550	usbmidi_get_config_desc	101 bytes at 0x20000160
+0x0800a560	usbmidi_get_qualifier_desc
+0x0800a570	usbmidi_class_init	open EP 0x81/0x02, arm RX
+0x0800a5b8	usbmidi_class_setup
+0x0800a7a0	usbd_get_config_str	"AUDIO Config"
+0x0800a7d8	usbd_get_device_desc
+0x0800a7e8	usbd_get_interface_str	"AUDIO Interface"
+0x0800a820	usbd_get_langid_desc
+0x0800a830	usbd_get_manufacturer_str	"Arturia"
+0x0800a850	usbd_get_product_str	"Arturia KeyStep 32"
+0x0800a88c	usbd_get_serial_str	"00000000001A"
+0x0800aad0	USBD_GetString
+0x0800bd98	USB_HP_CAN1_TX_IRQHandler
+0x0800bda8	USB_LP_CAN1_RX0_IRQHandler
+0x0800be40	pitchbend_strip_process	alt: pitchstrip_process
+0x0800c010	fatal_blink_halt
+0x0800c0c4	factory_token_next	token stream reader (?)
+0x0800c0f0	modstrip_process
 0x0800c1f4	app_main
-0x08016610	keymatrix_ctor
-0x080165ea	keymatrix_select
-0x080165b8	keymatrix_read
-0x080165cc	keymatrix_reset
-0x0800dff8	buttonbus_ctor
-0x0800dfb0	buttonbus_select	PE7/PB2
+0x0800c9d0	pitchbend_spring_step	table 0x08019D91; alt: pitchbend_springback
+0x0800ca82	touchstrip_read_step	8-step I2C state machine; alt: touchstrip_i2c_step
+0x0800cbdc	touchstrip_chip_verify
+0x0800cd38	din_tx_write
+0x0800cd94	SystemClock_Config
+0x0800ce68	midi_clock_rt_handler
+0x0800d020	touchstrip_chip_init
+0x0800d184	touchstrip_setup	init+verify+enable
+0x0800d1dc	aftertouch_process
+0x0800d330	aftertouch_sample
+0x0800d3b8	aftertouch_select_curve	param 0x1a
+0x0800d51e	arp_get_mode
+0x0800d548	arp_get_octave_range
+0x0800d550	arp_set_octave_range
+0x0800d578	arp_note_event
+0x0800d644	arp_set_mode
+0x0800d660	arp_set_hold
+0x0800d6a8	arp_random_pattern
+0x0800d768	arp_random_walk
+0x0800d7d4	arp_rng_next	LCG *0x0BB38435+0x3619636B
+0x0800d80c	arp_drop_released
+0x0800d83e	arp_set_random_length
+0x0800d850	arp_build_pattern
+0x0800ddec	arp_init	scratch buffer 0x20004308 defaults; alt: arp_scratch_seq_init
+0x0800de68	arp_reset
+0x0800de90	arp_get_octave
+0x0800de98	arp_octave_advance
+0x0800df58	arp_ctor
 0x0800df78	buttonbus_read	PD8-PD15 inverted
 0x0800df8c	buttonbus_reset
-0x08011b8c	scanner_ctor
-0x08011b52	scanner_scan_all
-0x0801511a	button_bit_ctor
-0x08015102	button_bit_read
-0x0800f9d2	button_ctor	id, led
+0x0800dfb0	buttonbus_select	PE7/PB2
+0x0800dff8	buttonbus_ctor
+0x0800e01c	clock_transport	cmd 0 stop,1 start,2 pause,3 continue,4 resync; sends FA/FB/FC
+0x0800e438	clock_sync_out_update	Sync Out pulse generation; alt: clock_engine_tick
+0x0800e5c8	clock_get_source	0 int,1 USB,2 sync,3 MIDI
+0x0800e5d0	clock_set_source	0 internal,1 MIDI/USB(?),2 sync in
+0x0800e68c	clock_ext_pulse_fill	ticks to interpolate per external pulse
+0x0800e6dc	clock_set_spp
+0x0800e820	timediv_ticks_per_step	division index 0..7 -> 480/240/120/60/320/160/80/40 ticks; alt: timediv_ticks
+0x0800e868	clock_quantize_pos	round position to nearest step (+T/2)
+0x0800e918	clock_init	(obj, seq, player, bpm100=12000, div=2)
+0x0800e96c	sync_on_settings	settings +0x4C
+0x0800ea2c	seq_engine_tick	step/swing/gate/next-seq engine, called 3x per main loop; alt: seq_clock_tick
+0x0800f098	clock_set_tempo	BPMx100 -> TIM2 ARR (480 PPQN)
+0x0800f0f4	clock_gate_sync_edge	Sync In gate edges drive steps in 1-step mode
+0x0800f160	clock_ctor	clock/engine object 0x20001780
 0x0800f2d8	button_poll
 0x0800f3a0	button_on_press
 0x0800f7f0	button_on_release
 0x0800f980	button_debounce
-0x08017eb0	keyboard_init	velocity curves
-0x08016f78	keyboard_process
-0x08013dd8	leds_init
-0x08013ae8	leds_set_bit
-0x08013ab0	leds_blink
-0x08013b3e	leds_blink_stop
-0x08013b54	leds_blink_tick
-0x08013da4	leds_flush	SPI2 + PB12 latch
-0x0801378a	leds_latch_write
-0x08013b12	leds_set_brightness_pct	TIM3 CH4 PC9
-0x0801379c	leds_boot_animation
-0x08013172	pitch_cv_ctor
+0x0800f9d2	button_ctor	id, led
+0x0800f9f8	midi_parser_feed
+0x0800fc3c	notelist_get_order
+0x0800fc52	notelist_count
+0x0800fc58	notelist_get_sorted
+0x0800fc74	notelist_sort
+0x0800fcb4	notelist_clear
+0x0800fcba	notelist_add	max 32, no dupes
+0x0800fcf8	notelist_remove
+0x0800fd58	notelist_find
+0x0800fd78	notelist_ctor
+0x0800fe8c	seq_transpose_note	note + (transpose - centre), octave fold
+0x0800fedc	chord_transpose_note
+0x08010054	seqplayer_step_off	note-off / tie hold; alt: step_note_off
+0x080101ec	midi_clock_tick	sends 0xF8 every 20 ticks, LED6 blink; alt: clock_out_tick
+0x080102a0	seqplayer_step_on	note-on for a step (ties, legato, transpose, chord); alt: step_note_on
+0x080107f8	sysex_parser_byte	alt: sysex_decoder_feed
+0x08010dc2	sysex_decoder_end
+0x08010e54	sysex_parser_ctor
+0x08010ef0	test_sync_clock_loop
+0x08010f40	test_sync_start_loop
+0x08010f90	test_mode_enter
+0x08010fe4	test_pedal_adc
+0x08011148	test_din_loop
+0x0801117c	touchstrip_ready
+0x0801118c	touchstrip_raw
+0x08011192	touchstrip_scaled
+0x080111de	touchstrip_set_cal_lo
+0x080111e2	touchstrip_set_cal_hi
+0x080111ec	touchstrip_read
+0x0801120e	touchstrip_ctor
+0x08011250	i2c_bus_recover
+0x0801137c	seq_block_write	cmd 0x0C
+0x080114cc	seq_block_read	cmd 0x0B
+0x080115bc	seq_param_set	cmd 0x21/0x25
+0x0801174c	sysex_send_ack	cmd 0x1C
+0x08011768	sysex_ctrl_set	b8<0x40, LED control
+0x08011858	curve_segment_eval	y=a*x/b-c clamped
+0x08011a88	sustain_input_process
+0x08011ac4	sustain_read_state	1000/3095 window
+0x08011b04	sustain_detect_polarity
+0x08011b52	scanner_scan_all
+0x08011b8c	scanner_ctor
+0x08011bf2	midi_cc_tracker
+0x08011cb4	seqarp_switch_process
+0x08011d8a	sysex_hdr_init
+0x08011da4	mode_knob_process
+0x08011ed4	sysex_get_handler
+0x08011fd4	sysex_cal_handler	cmd 0x08 touch-strip calibration; alt: sysex_calib_handler
+0x080120c4	sysex_command_handler
+0x08012740	usbmidi_rx_push	CIN unpack into 256-byte ring, drop if <80 free; alt: usb_midi_rx_packets
+0x080127b8	midi_in_set_channel
+0x080127f4	midi_din_rt_handle
+0x0801284c	midi_din_rt_drain
+0x080128ae	midi_usb_parse_pending
+0x08012906	midi_din_rx_byte
+0x08012918	midi_in_init
+0x08012980	midi_in_on_setting
+0x080129cc	sysex_identity_handler	alt: midi_in_on_universal
+0x08012a88	midi_in_msg_dispatch	SysEx only for USB context; alt: midi_in_on_sysex
+0x08012b28	midi_in_on_message
+0x08012c40	midi_in_ctor	obj 0x2000471C
+0x08012e88	ext_transpose_process
+0x08012ee4	midi_to_cv_process
+0x0801307c	timediv_knob_process
 0x080130fa	pitch_cv_start
 0x08013114	pitch_cv_write8
 0x08013154	pitch_cv_write16	PC6 hi / PC7 lo
-0x08018d9c	pitch_cv_from_note_bend
-0x08013354	mod_cv_ctor
-0x080132ac	mod_cv_start
+0x08013172	pitch_cv_ctor
+0x0801318e	adc_sampler_attach
+0x080131ac	adc_sampler_ctor
+0x080131bc	adc_sampler_dma_done
+0x080131ce	adc_sampler_start_dma
+0x080131e4	adc_sampler_dispatch
 0x08013256	mod_cv_write12	DAC ch1 PA4
 0x08013290	mod_cv_set_range_mv
-0x080134a8	gate_ctor
+0x080132ac	mod_cv_start
+0x08013354	mod_cv_ctor
 0x08013374	gate_set_level_mode	PA2/PA0
 0x0801345c	gate_write	PA1 inverted
-0x080150e6	sync_ctor
+0x080134a8	gate_ctor
+0x080134d8	tempo_knob_process
+0x0801378a	leds_latch_write
+0x0801379c	leds_boot_animation
+0x08013ab0	leds_blink
+0x08013ae8	leds_set_bit
+0x08013b12	leds_set_brightness_pct	TIM3 CH4 PC9
+0x08013b3e	leds_blink_stop
+0x08013b54	leds_blink_tick
+0x08013da4	leds_flush	SPI2 + PB12 latch
+0x08013dd8	leds_init
+0x08013fde	note_table_feed
+0x08014052	note_table128_ctor
+0x08014070	ui_set_seq_arp
+0x080141e4	ui_hold
+0x080142f0	ui_transport_button	Play/Stop/Rec/Shift combos, transport state machine; alt: ui_button_event
+0x08014d60	ui_select_sequence	queue sequence change
+0x08014dec	ui_send_transport_msg	transport MMC/CC out; alt: ui_poll_record_cc
 0x08015018	sync_read_clock_in
 0x0801504a	sync_clock_thru
 0x08015064	sync_read_start_in
 0x08015096	sync_start_thru
-0x080131ac	adc_sampler_ctor
-0x0801318e	adc_sampler_attach
-0x080131ce	adc_sampler_start_dma
-0x080131e4	adc_sampler_dispatch
-0x080131bc	adc_sampler_dma_done
-0x080134d8	tempo_knob_process
-0x08011a88	sustain_input_process
-0x08011b04	sustain_detect_polarity
-0x08011da4	mode_knob_process
-0x0801307c	timediv_knob_process
-0x0800d1dc	aftertouch_process
-0x0801120e	touchstrip_ctor
-0x0800d020	touchstrip_chip_init
-0x0800cbdc	touchstrip_chip_verify
-0x08011250	i2c_bus_recover
-0x080111ec	touchstrip_read
-0x08011192	touchstrip_scaled
-0x0800be40	pitchbend_strip_process
-0x0800c0f0	modstrip_process
-0x08019b0c	midi_router_get
-0x080169c4	midi_out_usb
-0x080166c8	midi_out_din
-0x08016930	cv_note_event
-0x08016a20	cv_mod_set
-0x08016650	cv_gate_set
-0x08015c08	seq_flash_is_empty
+0x080150e6	sync_ctor
+0x08015102	button_bit_read
+0x0801511a	button_bit_ctor
+0x0801517e	seq_tie_on_source	returns hdr[0x404]==1
+0x080151c0	seqrec_step_key	step record key event
+0x08015342	seq_set_length	clamp 1..64
+0x08015354	seq_set_length_pad	set length, pad new steps with rests
+0x08015414	seq_clear_last	delete last step
+0x08015476	pattern_set_gate	+0x402
+0x080154b0	seqrec_realtime_write	write RT buffer into current step
+0x0801559e	seq_clear_steps	all steps rest/100; alt: pattern_clear
+0x080155c2	seqrec_rt_tap	RT record Tap rest/tie
+0x0801561e	seqrec_rt_key	RT record held-note collection
+0x0801573e	seq_set_placeholder	length 1 + rest
+0x0801577c	pattern_set_swing	+0x401
+0x08015794	seqrec_tap	step record Tap (rest/tie)
+0x08015a04	seq_load_template	builds template from tables 0x0801A272/0x200001F8/0x20000218
+0x08015b08	seq_flash_addr	0x0803B000 + n*0x800
+0x08015b6c	word_copy
+0x08015b90	seq_flash_save_start	copy to buffer + start erase
 0x08015bd0	seq_flash_erase_all
+0x08015c08	seq_flash_is_empty
+0x08015c68	settings_save_job	flashpage_write_merge(0, 0x20005084, 0x80)
+0x08015c80	bootloader_flag_write	0x0803F800
 0x08015cd0	settings_load
+0x08015cf4	seq_flash_write_factory	factory sequences from token stream
+0x08015dc8	flash_erase_start	range check 0x0803B000..0x0803F000 else fatal 3; alt: flash_page_erase_it
+0x08015e20	touchstrip_cal_save_job	merge 4 bytes at page +0x200
+0x08015e6c	seq_mark_dirty	bits 0-7; alt: seq_collect_dirty
 0x08015eb8	touchstrip_cal_load
+0x08015f24	touchstrip_cal_mark_dirty	bit 9
+0x08015f34	flash_worker	main-loop flash state machine; alt: flash_writer_poll
+0x08016024	settings_page_invalidate	factory reset: rewrite page with word0=FFFFFFFF
+0x08016060	settings_mark_dirty	sets bit 8 of flashmgr+0x80C; alt: request_flush, settings_request_save
+0x0801606e	flash_erase_done_cb	FLASH IRQ callback
+0x080160d6	flashpage_erase_blocking
+0x080160f8	flashpage_write_merge	copy page 0x0803F000, overlay, start IT erase
+0x08016148	flashpage_program_blocking	0x200 words
+0x08016174	seq_load_from_flash	flash -> RAM 0x102 words
+0x08016224	sustain_cc_on
+0x080162d0	sustain_cc_off
+0x0801636c	hold_button_press
+0x080163f4	hold_button_release
+0x08016456	hold_pedal_press
+0x080164de	hold_pedal_release
+0x080165b8	keymatrix_read
+0x080165cc	keymatrix_reset
+0x080165ea	keymatrix_select
+0x08016610	keymatrix_ctor
+0x08016650	cv_gate_set
+0x08016668	cv_bend_set
+0x08016694	cv_pitch_set
+0x080166c8	midi_out_din
+0x0801674c	midi_out_service
+0x080167e8	usbmidi_pack_msg	cable 0, CIN from status; alt: usb_midi_pack
+0x08016870	usbmidi_flush_ring	up to 16 packets per transfer on EP 0x81; alt: usb_midi_flush_short
+0x08016930	cv_note_event
+0x0801699c	midi_out_local
+0x080169c4	midi_out_usb
+0x08016a20	cv_mod_set
+0x08016a38	midi_router_ctor
+0x08016a90	sysex_reply_service	one queued SysEx per tick; alt: sysex_queue_service
+0x08016bc4	universal_sysex_queue
+0x08016bec	sysex_send_arturia	alt: arturia_sysex_build
+0x08016d38	sysex_send_universal	alt: universal_sysex_build
+0x08016dd4	usbmidi_sysex_end_flush
+0x08016e68	usbmidi_put_sysex_byte	alt: sysex_out_byte
+0x08016ed8	sysex_queue_ctor
+0x08016f78	keyboard_process
+0x08017eb0	keyboard_init	velocity curves
+0x08018314	keyboard_velocity_curve_select	param 0x19
+0x08018344	kb_shift_key_param	swing/gate/channel
+0x080184ec	keyboard_ctor
+0x08018588	settings_test_flag_set	+0xAC flags; clear-path bug
+0x080185b8	settings_set	clamp + store + event {1,p,v}; alt: settings_set_param
 0x080187b4	settings_sanitize
+0x08018820	settings_defaults	not a Ghidra function; writes defaults
 0x0801894a	settings_broadcast
-0x08014070	ui_set_seq_arp
-0x080141e4	ui_hold
-0x08018a46	syncswitch_ctor
 0x08018994	syncswitch_process
-0x08011cb4	seqarp_switch_process
+0x08018a10	sync_switch_map
+0x08018a46	syncswitch_ctor
+0x08018a8e	midi_msg_note_on
+0x08018aae	midi_msg_note_off
+0x08018ace	midi_msg_pitchbend
+0x08018aee	midi_msg_cc
+0x08018b0e	midi_is_note_on
+0x08018b2a	midi_is_note_off
+0x08018b4c	midi_msg_make
+0x08018b5a	velocity_curve_eval	x in 100us ticks
+0x08018bee	octave_get_semitones
+0x08018c3a	octave_get
+0x08018c42	octave_update_leds
+0x08018d3c	octave_reset
+0x08018d4c	octave_up
+0x08018d6a	octave_down
+0x08018d8a	octave_ctor	(obj,ledA,ledB,max)
+0x08018d9c	pitch_cv_from_note_bend
 0x08018eec	pitch_cv_note_to_code	V/oct or Hz/V
 0x08018f9c	pitch_cv_on_settings	settings 0x72/0x76/0x78/0x7C
-0x08016694	cv_pitch_set
+0x080190c4	cv_note_store
+0x0801918a	note_table_pick32
+0x080191ec	note_table_pick128	0 low,1 high,2 last
+0x08019248	hold_get
+0x0801925e	hold_led_update
+0x080192c4	settings_resolve_channel	0x41 -> user channel +0x42; alt: settings_get_param
+0x080192d6	midi_msg_length
+0x080194e4	settings_ctor	static ctor for 0x20005058
+0x08019538	app_objects_ctor
+0x080198dc	usb_rx_forward
+0x08019900	clamp_channel15
+0x08019ad2	midi_dispatch_listeners
+0x08019b0c	midi_router_get
 0x08019bec	hzv_table	89 x u32, 0x18FC0000*2^((i-48)/12)
-0x080120c4	sysex_command_handler
-0x08015c80	bootloader_flag_write	0x0803F800
+0x08019da2	at_curve_tables	3x256 bytes
+0x0801a0a2	swing_table	11 bytes 50..75
+0x0801a0ad	gate_table	5 bytes 10..90
