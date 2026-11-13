@@ -1,89 +1,89 @@
 # KeyStep USB Bootloader Protocol Kit
 
-Objetivo: capturar cómo Arturia MIDI Control Center carga un firmware `.led` al KeyStep por USB, para luego replicar ese protocolo con un cargador propio en Python.
+Goal: capture how Arturia MIDI Control Center uploads a `.led` firmware to the KeyStep over USB, in order to replicate that protocol with a custom Python loader.
 
-## Importante
+## Important
 
-Esto todavía NO carga firmware custom. Primero captura y analiza el protocolo.
+This does NOT load custom firmware yet. It first captures and analyzes the protocol.
 
-Ruta de trabajo:
+Workflow:
 
-1. Poner KeyStep en bootloader.
-2. Capturar una actualización oficial con Wireshark + USBPcap.
-3. Extraer los paquetes USB OUT.
-4. Compararlos contra el `.led` oficial.
-5. Con esa evidencia construir el cargador Python real.
+1. Put the KeyStep in bootloader mode.
+2. Capture an official update with Wireshark + USBPcap.
+3. Extract the USB OUT packets.
+4. Compare them against the official `.led`.
+5. With that evidence, build the real Python loader.
 
-## Material
+## Requirements
 
-- Windows recomendado para esta etapa.
-- Wireshark con USBPcap.
+- Windows recommended for this stage.
+- Wireshark with USBPcap.
 - Arturia MIDI Control Center.
-- Firmware oficial `.led`.
-- KeyStep por USB.
+- Official `.led` firmware.
+- KeyStep connected over USB.
 
-Wireshark puede capturar USB, y en Windows se usa USBPcap como backend de captura.
+Wireshark can capture USB; on Windows, USBPcap is used as the capture backend.
 
-## Captura recomendada en Windows
+## Recommended capture on Windows
 
-1. Instala Wireshark y marca la opción USBPcap durante la instalación.
-2. Desconecta el KeyStep.
-3. Abre Wireshark.
-4. Verás interfaces tipo `USBPcap1`, `USBPcap2`, etc.
-5. Inicia captura en una interfaz USBPcap.
-6. Pon el KeyStep en bootloader:
-   - desconecta el KeyStep;
-   - mantén Play + Stop + Record;
-   - conecta USB sin soltar;
-   - espera unos segundos.
-7. Abre Arturia MIDI Control Center.
-8. Carga el firmware oficial `.led`.
-9. Detén la captura cuando termine.
-10. Guarda como:
+1. Install Wireshark and check the USBPcap option during installation.
+2. Disconnect the KeyStep.
+3. Open Wireshark.
+4. You will see interfaces like `USBPcap1`, `USBPcap2`, etc.
+5. Start a capture on a USBPcap interface.
+6. Put the KeyStep in bootloader mode:
+   - disconnect the KeyStep;
+   - hold Play + Stop + Record;
+   - connect USB without releasing;
+   - wait a few seconds.
+7. Open Arturia MIDI Control Center.
+8. Load the official `.led` firmware.
+9. Stop the capture when it finishes.
+10. Save it as:
 
 ```text
 keystep_update.pcapng
 ```
 
-Si no sabes cuál interfaz USBPcap era, repite con otra o captura todas las USBPcap disponibles una por una.
+If you don't know which USBPcap interface it was, repeat with another one, or capture each available USBPcap interface one by one.
 
-## Extraer payloads con este kit
+## Extract payloads with this kit
 
-Instala `tshark` junto con Wireshark. Luego:
+Install `tshark` along with Wireshark. Then:
 
 ```bash
 python extract_usb_payloads.py keystep_update.pcapng --out out_payloads
 ```
 
-El script intentará extraer `usb.capdata`, `usb.data_fragment` y `usbhid.data`.
+The script will try to extract `usb.capdata`, `usb.data_fragment` and `usbhid.data`.
 
-## Comparar contra el .led
+## Compare against the .led
 
 ```bash
 python compare_led_to_capture.py keystep_Firmware_Update__1_0_28.led out_payloads
 ```
 
-Qué buscamos:
+What we're looking for:
 
-- Si aparece el `.led` como texto hexadecimal ASCII.
-- Si aparece el payload binario decodificado del `.led`.
-- Si aparece por bloques con headers/checksum.
-- Si el tráfico usa SysEx MIDI o un protocolo USB distinto.
+- Whether the `.led` appears as ASCII hex text.
+- Whether the decoded binary payload of the `.led` appears.
+- Whether it appears in blocks with headers/checksums.
+- Whether the traffic uses MIDI SysEx or a different USB protocol.
 
-## Archivo que debes devolver
+## File to share
 
-Cuando tengas la captura, sube aquí:
+Once you have the capture, share:
 
 ```text
 keystep_update.pcapng
 ```
 
-o, si pesa mucho:
+or, if it is too large:
 
 ```text
 out_payloads/
 ```
 
-comprimido en ZIP.
+compressed as a ZIP.
 
-Con eso se puede inferir el protocolo real.
+With that, the real protocol can be inferred.

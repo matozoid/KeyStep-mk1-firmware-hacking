@@ -1,6 +1,6 @@
 # Keyboard matrix
 
-## Pinout lógico
+## Logical pinout
 
 ```text
 Select lines: PE8, PE9, PE10, PE11, PE12, PE13, PE14, PE15
@@ -8,13 +8,13 @@ Read lines:   PD8, PD9, PD10, PD11, PD12, PD13, PD14, PD15
 Logic: active-low
 ```
 
-## Escaneo básico
+## Basic scanning
 
 ```c
 static uint8_t scan_row(uint8_t row)
 {
-    GPIOE->ODR |= 0xFF00;              // todas inactivas HIGH
-    GPIOE->ODR &= ~(1u << (8 + row));  // una fila activa LOW
+    GPIOE->ODR |= 0xFF00;              // all inactive HIGH
+    GPIOE->ODR &= ~(1u << (8 + row));  // one row active LOW
 
     for (volatile int i = 0; i < 80; i++) {}
 
@@ -22,37 +22,37 @@ static uint8_t scan_row(uint8_t row)
 }
 ```
 
-## Mapeo de contactos
+## Contact mapping
 
 ```text
-Grupo de 8 teclas 0:
-  contacto A → PE8  lee PD8–PD15
-  contacto B → PE9  lee PD8–PD15
+Key group 0 (8 keys):
+  contact A → PE8  reads PD8–PD15
+  contact B → PE9  reads PD8–PD15
 
-Grupo de 8 teclas 1:
-  contacto A → PE10 lee PD8–PD15
-  contacto B → PE11 lee PD8–PD15
+Key group 1 (8 keys):
+  contact A → PE10 reads PD8–PD15
+  contact B → PE11 reads PD8–PD15
 
-Grupo de 8 teclas 2:
-  contacto A → PE12 lee PD8–PD15
-  contacto B → PE13 lee PD8–PD15
+Key group 2 (8 keys):
+  contact A → PE12 reads PD8–PD15
+  contact B → PE13 reads PD8–PD15
 
-Grupo de 8 teclas 3:
-  contacto A → PE14 lee PD8–PD15
-  contacto B → PE15 lee PD8–PD15
+Key group 3 (8 keys):
+  contact A → PE14 reads PD8–PD15
+  contact B → PE15 reads PD8–PD15
 ```
 
-Para `keyIndex` de 0 a 31:
+For `keyIndex` from 0 to 31:
 
 ```text
-grupo   = keyIndex / 8
-columna = keyIndex % 8
+group  = keyIndex / 8
+column = keyIndex % 8
 
-Contacto A:
-  select = PE(8 + grupo*2)
-  read   = PD(8 + columna)
+Contact A:
+  select = PE(8 + group*2)
+  read   = PD(8 + column)
 
-Contacto B:
-  select = PE(8 + grupo*2 + 1)
-  read   = PD(8 + columna)
+Contact B:
+  select = PE(8 + group*2 + 1)
+  read   = PD(8 + column)
 ```

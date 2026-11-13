@@ -1,172 +1,172 @@
 # KeyFreak 🎹
 
-**Convertí un Arturia KeyStep Mk1 en un mini sintetizador digital que toca por sí solo.**
+**I turned an Arturia KeyStep Mk1 into a mini digital synthesizer that plays on its own.**
 
-Este repo documenta cómo lo hice: desde abrir el equipo y encontrar el microcontrolador, hasta capturar el protocolo de carga, descubrir cómo está cableado el teclado y escribir firmware propio que genera audio. Es un proyecto experimental y educativo, hecho a punta de prueba y error. Si te gusta el firmware embebido, la ingeniería inversa o el DIY de sintetizadores, espero que te sirva.
+This repo documents how I did it: from opening the unit and finding the microcontroller, to capturing the upload protocol, figuring out how the keyboard is wired and writing custom firmware that generates audio. It is an experimental, educational project, built through trial and error. If you like embedded firmware, reverse engineering or DIY synths, I hope you find it useful.
 
-> **Estado:** prueba de concepto funcional. El KeyStep arranca firmware propio, lee sus 32 teclas y suena por la salida Mod CV. No es un producto terminado ni reemplaza al firmware oficial.
+> **Status:** working proof of concept. The KeyStep boots custom firmware, reads its 32 keys and makes sound through the Mod CV output. It is not a finished product and does not replace the official firmware.
 
-- **Microcontrolador:** STM32F103VCT6 (ARM Cortex-M3)
-- **Cargador custom:** `KS-BootBridge`
-- **Salida de audio que funciona:** Mod CV / DAC2 / PA5
-- **Herramientas:** Ghidra · Wireshark/USBPcap · Python · GCC ARM Embedded · raw MIDI/SysEx
-- **Autor:** Mapache Bastardx
-
----
-
-## ⚠️ Antes de empezar: léete esto
-
-Modificar el firmware de un equipo comercial **puede dejarlo inservible**. Todo lo que está acá es experimental y lo hago bajo mi propio riesgo; si lo replicas, también es bajo el tuyo.
-
-**Eléctricamente:**
-- No conectes audífonos directo a las salidas CV.
-- Usa una mixer, interfaz de audio o entrada de sinte con el volumen bajo.
-- No sueldes modificaciones permanentes sin verificar pines y voltajes.
-- No alimentes módulos externos desde puntos internos sin medir antes.
-
-**Y por respeto a Arturia y a la legalidad**, en este repo (y te pido lo mismo si haces un fork):
-- No subo firmware oficial `.led`, ni dumps binarios, ni nada propietario extraído del fabricante.
-- No clono ni reemplazo comercialmente nada de Arturia, ni afirmo afiliación con ellos.
-- Si alguna herramienta necesita el firmware oficial, el usuario aporta el suyo **localmente**; no se redistribuye.
-
-Las marcas comerciales se usan solo de forma descriptiva.
+- **Microcontroller:** STM32F103VCT6 (ARM Cortex-M3)
+- **Custom loader:** `KS-BootBridge`
+- **Working audio output:** Mod CV / DAC2 / PA5
+- **Tools:** Ghidra · Wireshark/USBPcap · Python · GCC ARM Embedded · raw MIDI/SysEx
+- **Author:** Mapache Bastardx
 
 ---
 
-## Tabla de contenidos
+## ⚠️ Before you start: read this
 
-1. [La pregunta de la que salió todo](#1-la-pregunta-de-la-que-salió-todo)
-2. [El hardware por dentro](#2-el-hardware-por-dentro)
-3. [Entrar en modo bootloader](#3-entrar-en-modo-bootloader)
-4. [Capturar el protocolo con Wireshark](#4-capturar-el-protocolo-con-wireshark)
-5. [El formato `.led` y el cargador KS-BootBridge](#5-el-formato-led-y-el-cargador-ks-bootbridge)
-6. [Lo que encontré en Ghidra](#6-lo-que-encontré-en-ghidra)
-7. [El gran descubrimiento: la matriz del teclado](#7-el-gran-descubrimiento-la-matriz-del-teclado)
-8. [Primer audio y primeras teclas](#8-primer-audio-y-primeras-teclas)
-9. [Probando motores de síntesis](#9-probando-motores-de-síntesis)
-10. [MultiEngine y controles ocultos](#10-multiengine-y-controles-ocultos)
-11. [Mod CV como salida principal](#11-mod-cv-como-salida-principal)
-12. [Velocity por doble contacto](#12-velocity-por-doble-contacto)
-13. [Tabla de versiones](#13-tabla-de-versiones)
-14. [Arquitectura final del firmware](#14-arquitectura-final-del-firmware)
-15. [Comparación honesta con sintes comerciales](#15-comparación-honesta-con-sintes-comerciales)
-16. [Trabajo futuro](#16-trabajo-futuro)
-17. [Estructura del repo](#17-estructura-del-repo)
-18. [Cierre](#18-cierre)
+Modifying the firmware of a commercial device **can brick it**. Everything here is experimental and done at my own risk; if you replicate it, it is at yours.
+
+**Electrically:**
+- Do not plug headphones directly into the CV outputs.
+- Use a mixer, audio interface or synth input with the volume turned down.
+- Do not solder permanent modifications without verifying pins and voltages.
+- Do not power external modules from internal points without measuring first.
+
+**Out of respect for Arturia and the law**, in this repo (and I ask the same of you if you fork it):
+- I do not upload official `.led` firmware, binary dumps, or anything proprietary extracted from the manufacturer.
+- I do not clone or commercially replace anything from Arturia, nor claim any affiliation with them.
+- If a tool needs the official firmware, users supply their own **locally**; it is not redistributed.
+
+Trademarks are used for descriptive purposes only.
 
 ---
 
-## 1. La pregunta de la que salió todo
+## Table of contents
 
-Todo empezó con una duda bastante simple:
-
-> ¿Puede un Arturia KeyStep Mk1 ejecutar mi propio firmware y generar sonido por sí mismo, en vez de ser solo un controlador?
-
-El KeyStep nació como controlador MIDI/CV, pero por dentro lleva un microcontrolador STM32 perfectamente capaz de correr código propio, leer un teclado, mover GPIO, usar sus DACs y generar audio. Esa pregunta se convirtió en una lista de objetivos: identificar el chip, entender el bootloader y el formato de actualización, cargar código propio sin tocar herramientas oficiales, leer el teclado físico, sacar audio del DAC interno, armar motores de síntesis simples y dejarlo todo documentado para que otros puedan seguir el camino.
-
-Lo que sigue es ese recorrido, más o menos en el orden en que las cosas fueron encajando (con sus tropiezos incluidos, porque ahí está lo interesante).
+1. [The question that started it all](#1-the-question-that-started-it-all)
+2. [The hardware inside](#2-the-hardware-inside)
+3. [Entering bootloader mode](#3-entering-bootloader-mode)
+4. [Capturing the protocol with Wireshark](#4-capturing-the-protocol-with-wireshark)
+5. [The `.led` format and the KS-BootBridge loader](#5-the-led-format-and-the-ks-bootbridge-loader)
+6. [What I found in Ghidra](#6-what-i-found-in-ghidra)
+7. [The big discovery: the keyboard matrix](#7-the-big-discovery-the-keyboard-matrix)
+8. [First audio and first keys](#8-first-audio-and-first-keys)
+9. [Trying out synthesis engines](#9-trying-out-synthesis-engines)
+10. [MultiEngine and hidden controls](#10-multiengine-and-hidden-controls)
+11. [Mod CV as the main output](#11-mod-cv-as-the-main-output)
+12. [Velocity via dual contacts](#12-velocity-via-dual-contacts)
+13. [Version table](#13-version-table)
+14. [Final firmware architecture](#14-final-firmware-architecture)
+15. [An honest comparison with commercial synths](#15-an-honest-comparison-with-commercial-synths)
+16. [Future work](#16-future-work)
+17. [Repo structure](#17-repo-structure)
+18. [Closing thoughts](#18-closing-thoughts)
 
 ---
 
-## 2. El hardware por dentro
+## 1. The question that started it all
 
-Abriendo el equipo e inspeccionando la placa, el cerebro resultó ser un **STM32F103VCT6**:
+It all began with a fairly simple question:
 
-| Característica | Valor aproximado |
+> Can an Arturia KeyStep Mk1 run my own firmware and generate sound by itself, instead of just being a controller?
+
+The KeyStep was designed as a MIDI/CV controller, but inside it has an STM32 microcontroller perfectly capable of running custom code, reading a keyboard, driving GPIO, using its DACs and generating audio. That question turned into a list of goals: identify the chip, understand the bootloader and the update format, load custom code without touching the official tools, read the physical keyboard, get audio out of the internal DAC, build simple synthesis engines, and document everything so others can follow the same path.
+
+What follows is that journey, roughly in the order things fell into place (stumbles included, because that is where the interesting part is).
+
+---
+
+## 2. The hardware inside
+
+Opening the unit and inspecting the board, the brain turned out to be an **STM32F103VCT6**:
+
+| Feature | Approximate value |
 |---|---|
-| Núcleo | ARM Cortex-M3 |
-| Frecuencia | hasta 72 MHz |
+| Core | ARM Cortex-M3 |
+| Clock | up to 72 MHz |
 | Flash | ~256 KB |
 | RAM | ~48 KB |
-| DAC | 2 canales de 12 bits |
+| DAC | 2 channels, 12-bit |
 
-Ese DAC de dos canales es la clave para hacer ruido. Sus salidas son:
+That two-channel DAC is the key to making noise. Its outputs are:
 
 ```text
 PA4 = DAC_OUT1 = DAC1
 PA5 = DAC_OUT2 = DAC2
 ```
 
-Al principio asumí que el audio saldría por `Pitch CV / DAC1 / PA4`. **Estaba equivocado.** En la unidad que probé, esa salida no servía como audio útil, y la que terminó funcionando fue:
+At first I assumed audio would come out of `Pitch CV / DAC1 / PA4`. **I was wrong.** On the unit I tested, that output was not usable for audio, and the one that ended up working was:
 
 ```text
-Audio principal = Mod CV / DAC2 / PA5
+Main audio = Mod CV / DAC2 / PA5
 ```
 
-Lo aclaro acá arriba porque me costó iteraciones darme cuenta, y no quiero que pierdas tiempo con la misma hipótesis. Más detalle en la [sección 11](#11-mod-cv-como-salida-principal).
+I point this out up front because it took me several iterations to figure it out, and I don't want you to waste time on the same hypothesis. More detail in [section 11](#11-mod-cv-as-the-main-output).
 
 ---
 
-## 3. Entrar en modo bootloader
+## 3. Entering bootloader mode
 
-El KeyStep entra en modo de actualización si mantienes una combinación de botones mientras lo conectas por USB:
+The KeyStep enters update mode if you hold a button combination while connecting it over USB:
 
 ```text
-Record + Stop + Play/Pause + conectar USB
+Record + Stop + Play/Pause + plug in USB
 ```
 
-En Linux aparece como un dispositivo distinto:
+On Linux it shows up as a different device:
 
 ```text
 USB:  Arturia KeyStep Updater
 MIDI: KeyStep Updater MIDI 1
 ```
 
-En ese modo, el equipo escucha firmware por mensajes MIDI/SysEx. El problema era: ¿cómo se los envío yo?
+In this mode, the device listens for firmware via MIDI/SysEx messages. The problem was: how do I send them myself?
 
 ---
 
-## 4. Capturar el protocolo con Wireshark
+## 4. Capturing the protocol with Wireshark
 
-Para cargar firmware propio necesitaba entender cómo el updater oficial le habla al KeyStep. Así que capturé el tráfico de una actualización oficial con **Wireshark + USBPcap** y observé el flujo:
+To load custom firmware I needed to understand how the official updater talks to the KeyStep. So I captured the traffic of an official update with **Wireshark + USBPcap** and observed the flow:
 
 ```text
 PC / updater
-   ↓  handshake SysEx
-KeyStep responde
-   ↓  frames de firmware
-ACK por cada frame
+   ↓  SysEx handshake
+KeyStep responds
+   ↓  firmware frames
+ACK per frame
    ↓
-ACK final
+final ACK
 ```
 
-Los mensajes que identifiqué fueron:
+The messages I identified were:
 
-| Mensaje | Bytes |
+| Message | Bytes |
 |---|---|
 | Handshake (PC → KeyStep) | `F0 5A 57 6E 28 3C 4E 3F F7` |
-| Respuesta del KeyStep | `F0 3F F7` |
-| Frame de firmware | `F0 <22 chars ASCII hex> F7` |
-| ACK por frame | `F0 1A F7` |
-| ACK final | `F0 77 F7` |
+| KeyStep response | `F0 3F F7` |
+| Firmware frame | `F0 <22 chars ASCII hex> F7` |
+| Per-frame ACK | `F0 1A F7` |
+| Final ACK | `F0 77 F7` |
 
-Wireshark fue lo que destrabó el proyecto entero: me dejó ver que era MIDI/SysEx, encontrar el handshake, entender el tamaño y la forma de los frames, ver los ACKs y, en definitiva, **reproducir el comportamiento del updater con mi propio código**. Sin esa captura habría sabido generar binarios, pero sin una forma confiable de meterlos al equipo.
+Wireshark is what unlocked the whole project: it showed me that it was MIDI/SysEx, let me find the handshake, understand the size and shape of the frames, see the ACKs and, ultimately, **reproduce the updater's behavior with my own code**. Without that capture I would have known how to build binaries, but would have had no reliable way to get them onto the device.
 
 ---
 
-## 5. El formato `.led` y el cargador KS-BootBridge
+## 5. The `.led` format and the KS-BootBridge loader
 
-El firmware oficial usa extensión `.led`. No es un binario plano: lleva los datos en **ASCII hex**. Lo que observé:
+The official firmware uses the `.led` extension. It is not a flat binary: it carries the data as **ASCII hex**. What I observed:
 
 ```text
-Frame raw:        2078 bytes
-Frame ASCII hex:  4156 caracteres
-Cola final:       12 bytes raw = 24 caracteres hex
+Raw frame:        2078 bytes
+ASCII hex frame:  4156 characters
+Final tail:       12 raw bytes = 24 hex characters
 ```
 
-Con eso pude armar un empaquetador que toma un binario propio y lo mete en una estructura compatible con el bootloader, y un cargador al que llamé **KS-BootBridge** porque hace de puente entre el firmware custom y el bootloader MIDI/SysEx del KeyStep.
+With that I was able to build a packer that takes a custom binary and wraps it in a structure compatible with the bootloader, plus a loader I called **KS-BootBridge**, because it acts as a bridge between the custom firmware and the KeyStep's MIDI/SysEx bootloader.
 
-Lo que hace el cargador, paso a paso:
+What the loader does, step by step:
 
-1. Abre el puerto raw MIDI.
-2. Envía el handshake.
-3. Espera la respuesta del KeyStep.
-4. Lee/divide los frames del `.led`.
-5. Manda cada frame como SysEx.
-6. Espera el ACK de cada frame.
-7. Espera el ACK final.
+1. Opens the raw MIDI port.
+2. Sends the handshake.
+3. Waits for the KeyStep's response.
+4. Reads/splits the `.led` frames.
+5. Sends each frame as SysEx.
+6. Waits for the ACK of each frame.
+7. Waits for the final ACK.
 
-Uso conceptual:
+Conceptual usage:
 
 ```bash
 python3 ks_bootbridge.py firmware.led --port hw:2,0,0
@@ -174,21 +174,21 @@ python3 ks_bootbridge.py firmware.led --port hw:2,0,0
 
 ---
 
-## 6. Lo que encontré en Ghidra
+## 6. What I found in Ghidra
 
-Cargué el firmware en Ghidra como **ARM Cortex-M Thumb**, con un detalle importante: la aplicación no empieza en `0x08000000`, sino después de la zona del bootloader. La base correcta es:
+I loaded the firmware into Ghidra as **ARM Cortex-M Thumb**, with one important detail: the application does not start at `0x08000000`, but after the bootloader region. The correct base is:
 
 ```text
 0x08004000
 ```
 
-Con la base bien puesta, la tabla de vectores tenía sentido (stack pointer en RAM, reset vector apuntando a `0x08004xxx`) y pude reconstruir la ruta de arranque:
+With the base set correctly, the vector table made sense (stack pointer in RAM, reset vector pointing to `0x08004xxx`) and I could reconstruct the boot path:
 
 ```text
-Reset trampoline → early init → runtime init → App_Main → init de periféricos → loop principal
+Reset trampoline → early init → runtime init → App_Main → peripheral init → main loop
 ```
 
-Fui renombrando funciones para entender los subsistemas. Algunas de las más útiles:
+I renamed functions as I went to understand the subsystems. Some of the most useful ones:
 
 ```text
 App_Main
@@ -204,116 +204,116 @@ KeyboardScanner_Update
 MIDI_NoteOn_Build / NoteOff / ControlChange / PitchBend
 ```
 
-Eso me dejó separar el firmware en bloques: init de hardware, escaneo de teclado, MIDI, control values, sequencer, DAC/CV y USB. Pero lo que de verdad importaba estaba escondido en una sola línea.
+That let me split the firmware into blocks: hardware init, keyboard scanning, MIDI, control values, sequencer, DAC/CV and USB. But what really mattered was hidden in a single line.
 
 ---
 
-## 7. El gran descubrimiento: la matriz del teclado
+## 7. The big discovery: the keyboard matrix
 
-La función que lo cambió todo fue esta:
+The function that changed everything was this one:
 
 ```c
 InputScanner8_Init(DAT_080196e4, DAT_080196e0, 8, DAT_080196dc, 8);
 ```
 
-Reconstruyendo la firma:
+Reconstructing the signature:
 
 ```c
 InputScanner8_Init(scanner, selectPort, selectShift, readPort, readShift);
 ```
 
-Resolviendo las direcciones:
+Resolving the addresses:
 
 ```text
 DAT_080196e4 = 0x20000F44   → scanner
-DAT_080196e0 = 0x40011800   → GPIOE  (líneas de selección)
-DAT_080196dc = 0x40011400   → GPIOD  (líneas de lectura)
+DAT_080196e0 = 0x40011800   → GPIOE  (select lines)
+DAT_080196dc = 0x40011400   → GPIOD  (read lines)
 ```
 
-Y ahí estaba el cableado real del teclado:
+And there was the real keyboard wiring:
 
 ```text
-PE8–PE15 = selección
-PD8–PD15 = lectura
+PE8–PE15 = select
+PD8–PD15 = read
 ```
 
-### Cómo funciona eléctricamente
+### How it works electrically
 
-El scanner es **activo en bajo**: pones todas las líneas de selección en alto, bajas una sola, lees las de entrada, inviertes y guardas. Repites para las 8 filas.
+The scanner is **active-low**: you drive all select lines high, pull a single one low, read the inputs, invert and store. Repeat for all 8 rows.
 
 ```c
 for (row = 0; row < 8; row++) {
-    GPIOE->ODR |= 0xFF00;              // todo inactivo
-    GPIOE->ODR &= ~(1 << (8 + row));   // seleccionar fila
+    GPIOE->ODR |= 0xFF00;              // all inactive
+    GPIOE->ODR &= ~(1 << (8 + row));   // select row
     delay_small();
     rows[row] = ~(GPIOD->IDR >> 8) & 0xFF;
 }
 ```
 
-### De la matriz a las teclas
+### From matrix to keys
 
-El KeyStep tiene 32 teclas y **cada una tiene dos contactos** (A y B). La cuenta cuadra perfecto:
-
-```text
-32 teclas × 2 contactos = 64
-8 selects × 8 reads      = 64
-```
-
-Las líneas de selección se reparten en pares (un contacto A y uno B por grupo de 8 teclas):
+The KeyStep has 32 keys and **each one has two contacts** (A and B). The numbers add up perfectly:
 
 ```text
-PE8/PE9   → grupo 0 (A/B)
-PE10/PE11 → grupo 1 (A/B)
-PE12/PE13 → grupo 2 (A/B)
-PE14/PE15 → grupo 3 (A/B)
+32 keys × 2 contacts = 64
+8 selects × 8 reads  = 64
 ```
 
-Y las de lectura (`PD8–PD15`) seleccionan la columna. La fórmula para cualquier tecla:
+The select lines are split into pairs (one A contact and one B contact per group of 8 keys):
 
 ```text
-grupo   = keyIndex / 8
-columna = keyIndex % 8
-
-Contacto A:  PE = 8 + grupo*2       ,  PD = 8 + columna
-Contacto B:  PE = 8 + grupo*2 + 1   ,  PD = 8 + columna
+PE8/PE9   → group 0 (A/B)
+PE10/PE11 → group 1 (A/B)
+PE12/PE13 → group 2 (A/B)
+PE14/PE15 → group 3 (A/B)
 ```
 
-Por ejemplo, la tecla 0 es `PE8+PD8` (A) y `PE9+PD8` (B); la tecla 31 es `PE14+PD15` (A) y `PE15+PD15` (B).
+And the read lines (`PD8–PD15`) select the column. The formula for any key:
 
-> **Lo que aprendí por las malas:** antes de esto intenté mapear pines GPIO sueltos "a ciegas", y solo conseguí falsos positivos. El teclado **no** se puede leer mirando pines individuales; hay que activar `PE8–PE15` una por una y leer `PD8–PD15`. Ese fue el salto de las pruebas erráticas a una lectura real.
+```text
+group  = keyIndex / 8
+column = keyIndex % 8
+
+Contact A:  PE = 8 + group*2       ,  PD = 8 + column
+Contact B:  PE = 8 + group*2 + 1   ,  PD = 8 + column
+```
+
+For example, key 0 is `PE8+PD8` (A) and `PE9+PD8` (B); key 31 is `PE14+PD15` (A) and `PE15+PD15` (B).
+
+> **What I learned the hard way:** before this I tried mapping individual GPIO pins "blindly", and only got false positives. The keyboard **cannot** be read by looking at individual pins; you have to activate `PE8–PE15` one at a time and read `PD8–PD15`. That was the leap from erratic tests to a real reading.
 
 ---
 
-## 8. Primer audio y primeras teclas
+## 8. First audio and first keys
 
-Con el cargador y la matriz resueltos, fui validando por partes:
+With the loader and the matrix figured out, I validated things piece by piece:
 
-- **V4 — escribir en el DAC:** hice que la salida alternara voltaje. Funcionó → el firmware propio podía controlar el DAC.
-- **V5 — audio básico:** generé una señal audible simple. La unidad sonó → la cadena bootloader → uploader → firmware estaba completa.
-- **V22 — escaneo real:** usé `PE8–PE15` / `PD8–PD15` y al apretar teclas sonaban beeps → la matriz descubierta era correcta.
-- **V23 — una nota por tecla:** asigné una frecuencia a cada tecla y cada una dio su nota. **Este fue el momento en que el KeyStep dejó de ser controlador y pasó a ser instrumento.**
-
----
-
-## 9. Probando motores de síntesis
-
-Acá vino mucha prueba y error. Resumen honesto de lo que probé:
-
-- **Onda cuadrada:** baratísima en CPU, pero áspera.
-- **Wavetable / seno:** más suave, pero débil y poco expresiva.
-- **Moog-ish** (doble sierra + suboscilador + filtro digital simple + envolvente + saturación): útil como lead/bajo, aunque limitado por el DAC y la salida CV.
-- **Polifonía (4 voces):** técnicamente funcionó, pero sonó como una masa densa. Varias voces + sub + saturación sobre una sola salida DAC simple = mezcla turbia.
-- **FM / Yamaha-ish:** modulación de frecuencia simple. Más digital y brillante.
-- **Rhodes-ish:** no convenció. Un Rhodes pide dinámica, resonancia, preamp, amplificación y efectos; por DAC/CV no sale.
-- **MicroFreak-ish** (wavetable morph + FM suave + wavefolding + movimiento lento + vibrato): el carácter que mejor le calza a este hardware.
-
-La conclusión general: en vez de pelear contra el hardware imitando timbres analógicos complejos, conviene abrazar lo digital, que es donde el STM32 y el DAC se sienten cómodos.
+- **V4 — writing to the DAC:** made the output toggle voltage. It worked → custom firmware could control the DAC.
+- **V5 — basic audio:** generated a simple audible signal. The unit made sound → the bootloader → uploader → firmware chain was complete.
+- **V22 — real scanning:** used `PE8–PE15` / `PD8–PD15`, and pressing keys produced beeps → the discovered matrix was correct.
+- **V23 — one note per key:** assigned a frequency to each key and each one played its note. **This was the moment the KeyStep stopped being a controller and became an instrument.**
 
 ---
 
-## 10. MultiEngine y controles ocultos
+## 9. Trying out synthesis engines
 
-En la **V35** junté varios motores en un solo firmware, para dejar de compilar una versión por timbre:
+This is where a lot of trial and error came in. An honest summary of what I tried:
+
+- **Square wave:** extremely cheap on CPU, but harsh.
+- **Wavetable / sine:** smoother, but weak and not very expressive.
+- **Moog-ish** (dual saw + sub-oscillator + simple digital filter + envelope + saturation): useful as a lead/bass, though limited by the DAC and the CV output.
+- **Polyphony (4 voices):** technically worked, but sounded like a dense blob. Several voices + sub + saturation over a single simple DAC output = muddy mix.
+- **FM / Yamaha-ish:** simple frequency modulation. More digital and bright.
+- **Rhodes-ish:** not convincing. A Rhodes needs dynamics, resonance, preamp, amplification and effects; you can't get that out of DAC/CV.
+- **MicroFreak-ish** (wavetable morph + soft FM + wavefolding + slow movement + vibrato): the character that best suits this hardware.
+
+The overall conclusion: instead of fighting the hardware by imitating complex analog timbres, it is better to embrace digital, which is where the STM32 and the DAC feel comfortable.
+
+---
+
+## 10. MultiEngine and hidden controls
+
+In **V35** I combined several engines into a single firmware, so I no longer had to compile one version per timbre:
 
 ```text
 1 = MicroFreak-ish digital
@@ -323,95 +323,95 @@ En la **V35** junté varios motores en un solo firmware, para dejar de compilar 
 5 = Digital bell/pad
 ```
 
-Como todavía no mapeé los botones del panel, los controles van por combinaciones con **la tecla más grave**:
+Since I haven't mapped the panel buttons yet, controls are done via combinations with **the lowest key**:
 
-| Combinación | Acción |
+| Combination | Action |
 |---|---|
-| Grave + 1…5 | elegir motor (MicroFreak / FM / Moog / Acid / Bell-Pad) |
-| Grave + 6 / 7 / 8 | octava abajo / normal / arriba |
-| Grave + 9 / 10 / 11 | timbre oscuro / normal / brillante |
-| Grave + 12 / 13 / 14 | vibrato off / normal / profundo |
-| Grave + 15 | hold / latch |
-| Grave + 16 / 17 | velocity/accent off / on |
+| Lowest + 1…5 | select engine (MicroFreak / FM / Moog / Acid / Bell-Pad) |
+| Lowest + 6 / 7 / 8 | octave down / normal / up |
+| Lowest + 9 / 10 / 11 | dark / normal / bright timbre |
+| Lowest + 12 / 13 / 14 | vibrato off / normal / deep |
+| Lowest + 15 | hold / latch |
+| Lowest + 16 / 17 | velocity/accent off / on |
 
 ---
 
-## 11. Mod CV como salida principal
+## 11. Mod CV as the main output
 
-Durante varias versiones di por hecho que el audio iba por `Pitch CV / DAC1 / PA4`. La prueba real me corrigió: en mi unidad esa salida **no** servía como audio útil, y la buena era `Mod CV / DAC2 / PA5`.
+For several versions I took for granted that audio went through `Pitch CV / DAC1 / PA4`. Real-world testing corrected me: on my unit that output was **not** usable for audio, and the good one was `Mod CV / DAC2 / PA5`.
 
-Desde la **V37** en adelante el proyecto asume:
+From **V37** onward the project assumes:
 
 ```text
-Audio principal = Mod CV / DAC2 / PA5
-Pitch CV        = ignorado / reservado para pruebas futuras
+Main audio = Mod CV / DAC2 / PA5
+Pitch CV   = ignored / reserved for future testing
 ```
 
-Lo dejo bien marcado para que nadie repita mi confusión.
+I'm flagging this clearly so nobody repeats my confusion.
 
 ---
 
-## 12. Velocity por doble contacto
+## 12. Velocity via dual contacts
 
-Que cada tecla tenga **dos contactos** abre la puerta a medir con qué fuerza tocas. La idea:
+The fact that each key has **two contacts** opens the door to measuring how hard you play. The idea:
 
 ```text
-El contacto A se activa primero, el B después.
-La diferencia de tiempo aproxima la fuerza:
-  diferencia corta = golpe fuerte
-  diferencia larga = golpe suave
+Contact A triggers first, contact B afterwards.
+The time difference approximates the force:
+  short difference = hard strike
+  long difference  = soft strike
 ```
 
-Eso se puede mapear musicalmente a más volumen, más brillo, más cantidad de FM o un ataque más marcado. La **V40** implementó una primera aproximación tipo acento. Todavía es tosco, pero el principio funciona.
+This can be mapped musically to more volume, more brightness, more FM amount or a sharper attack. **V40** implemented a first accent-style approximation. It is still rough, but the principle works.
 
 ---
 
-## 13. Tabla de versiones
+## 13. Version table
 
-| Versión | Qué probé | Resultado |
+| Version | What I tried | Result |
 |---|---|---|
-| V4  | DAC alternando voltaje | validó control del DAC |
-| V5  | Audio básico | validó generación audible |
-| V22 | Scanner real PE/PD con beeps | validó la matriz |
-| V23 | Una nota por tecla | primer instrumento funcional |
-| V24 | Wavetable suave | menos áspero |
-| V25 | Moog-ish | lead/bajo más útil |
-| V26 | 4 voces | polifonía densa |
-| V27 | Dúo limpio | más claro |
-| V29 | Mono lead + portamento + arp | más usable |
-| V30 | FM + arp | digital brillante |
-| V31 | FM sin arp | más directo |
-| V32 | Rhodes-ish | no convincente |
-| V33 | Rhodes MK2-ish | mejor, pero limitado |
-| V34 | MicroFreak-ish | el enfoque más adecuado |
-| V35 | MultiEngine | 5 motores funcionando |
-| V36 | MultiEngine + octava | más usable |
-| V37 | Performance + Mod CV | confirmó la salida Mod CV |
-| V38 | Mod CV audio + Pitch auxiliar | Pitch no útil |
-| V39 | Solo Mod CV | arquitectura corregida |
-| V40 | Velocity / acento | primera dinámica |
+| V4  | DAC toggling voltage | validated DAC control |
+| V5  | Basic audio | validated audible output |
+| V22 | Real PE/PD scanner with beeps | validated the matrix |
+| V23 | One note per key | first working instrument |
+| V24 | Smooth wavetable | less harsh |
+| V25 | Moog-ish | more useful lead/bass |
+| V26 | 4 voices | dense polyphony |
+| V27 | Clean duo | clearer |
+| V29 | Mono lead + portamento + arp | more usable |
+| V30 | FM + arp | bright digital |
+| V31 | FM without arp | more direct |
+| V32 | Rhodes-ish | not convincing |
+| V33 | Rhodes MK2-ish | better, but limited |
+| V34 | MicroFreak-ish | the most suitable approach |
+| V35 | MultiEngine | 5 engines working |
+| V36 | MultiEngine + octave | more usable |
+| V37 | Performance + Mod CV | confirmed Mod CV output |
+| V38 | Mod CV audio + auxiliary Pitch | Pitch not useful |
+| V39 | Mod CV only | corrected architecture |
+| V40 | Velocity / accent | first dynamics |
 
 ---
 
-## 14. Arquitectura final del firmware
+## 14. Final firmware architecture
 
 ```text
 Reset
- → init de reloj
- → init GPIO
- → init DAC
- → configuración de la matriz PE/PD
- → loop principal:
-      escaneo de teclado
-      lectura de contactos A/B
-      detección de combinaciones
-      selección de motor
-      octava / timbre / vibrato / hold
-      render de síntesis
-      escritura a DAC2 / PA5 / Mod CV
+ → clock init
+ → GPIO init
+ → DAC init
+ → PE/PD matrix configuration
+ → main loop:
+      keyboard scan
+      read A/B contacts
+      detect combinations
+      engine selection
+      octave / timbre / vibrato / hold
+      synthesis render
+      write to DAC2 / PA5 / Mod CV
 ```
 
-En código, el loop es tan simple como:
+In code, the loop is as simple as:
 
 ```c
 while (1) {
@@ -425,38 +425,38 @@ while (1) {
 
 ---
 
-## 15. Comparación honesta con sintes comerciales
+## 15. An honest comparison with commercial synths
 
-Esto **no** es un MicroFreak, un MiniFreak ni un Reface DX. La descripción justa sería:
+This is **not** a MicroFreak, a MiniFreak or a Reface DX. A fair description would be:
 
-> **KeyFreak = un mono-synth digital DIY sobre STM32, estilo "MicroFreak-lite" experimental.**
+> **KeyFreak = a DIY digital mono-synth on STM32, an experimental "MicroFreak-lite".**
 
-**Lo que sí tiene:** teclado físico de 32 teclas leído por firmware propio, varios motores digitales simples, salida Mod CV usada como audio, control de octava/timbre/vibrato/hold y una primera aproximación a velocity.
+**What it does have:** a physical 32-key keyboard read by custom firmware, several simple digital engines, the Mod CV output used as audio, octave/timbre/vibrato/hold control and a first approximation of velocity.
 
-**Lo que no tiene:** códec de audio dedicado, salida de línea real, filtro analógico, efectos integrados, DSP potente, un motor FM completo ni polifonía de calidad comercial.
+**What it doesn't have:** a dedicated audio codec, a real line output, an analog filter, built-in effects, powerful DSP, a full FM engine or commercial-quality polyphony.
 
-Una mejora futura interesante sería un **DAC externo PCM5102** vía I2S (BCLK/LRCK/DATA), que daría menos ruido, mejor rango dinámico y un line-out limpio. El reto está en encontrar pines I2S libres, modificar hardware, escribir el driver y validar un sample rate estable. Ojo: el PCM5102 **no** se conecta a Mod CV; es una ruta de audio aparte.
-
----
-
-## 16. Trabajo futuro
-
-Lo que me gustaría seguir explorando (y donde se agradecen aportes):
-
-1. Mapear los botones reales del panel.
-2. Mapear las touch strips.
-3. Mejorar la velocity real por doble contacto.
-4. Presets más musicales y refinar el MultiEngine.
-5. Un modo parafónico limpio.
-6. Investigar I2S con PCM5102.
-7. Instalador más seguro + modo de recuperación.
-8. Documentar el hardware con fotos y diagramas.
-9. Separar el firmware en módulos y agregar tests de teclado/DAC.
-10. Control MIDI externo y demos de audio.
+An interesting future upgrade would be an **external PCM5102 DAC** over I2S (BCLK/LRCK/DATA), which would give less noise, better dynamic range and a clean line-out. The challenge is finding free I2S pins, modifying the hardware, writing the driver and validating a stable sample rate. Note: the PCM5102 does **not** connect to Mod CV; it is a separate audio path.
 
 ---
 
-## 17. Estructura del repo
+## 16. Future work
+
+Things I'd like to keep exploring (and where contributions are welcome):
+
+1. Map the actual panel buttons.
+2. Map the touch strips.
+3. Improve real velocity via dual contacts.
+4. More musical presets and refine the MultiEngine.
+5. A clean paraphonic mode.
+6. Investigate I2S with PCM5102.
+7. Safer installer + recovery mode.
+8. Document the hardware with photos and diagrams.
+9. Split the firmware into modules and add keyboard/DAC tests.
+10. External MIDI control and audio demos.
+
+---
+
+## 17. Repo structure
 
 ```text
 keystep-custom-synth/
@@ -488,32 +488,32 @@ keystep-custom-synth/
 └── images/
 ```
 
-**Qué incluir:** código C propio, scripts Python propios, documentación, fotos propias de la placa, diagramas propios, notas resumidas de Ghidra, el pinout descubierto, instrucciones de compilación y advertencias.
+**What to include:** your own C code, your own Python scripts, documentation, your own photos of the board, your own diagrams, summarized Ghidra notes, the discovered pinout, build instructions and warnings.
 
-**Qué NO incluir:** firmware oficial `.led`, dumps propietarios, binarios extraídos de Arturia, capturas con información redistribuible sensible, ni marcas usadas como si fueran propias.
+**What NOT to include:** official `.led` firmware, proprietary dumps, binaries extracted from Arturia, captures containing sensitive redistributable information, or trademarks used as if they were your own.
 
 ---
 
-## 18. Cierre
+## 18. Closing thoughts
 
-KeyFreak demuestra que un controlador "cerrado" como el KeyStep Mk1 puede transformarse en una pequeña plataforma abierta de síntesis. Pero para mí lo más valioso no fue que sonara, sino haber reconstruido el camino completo:
+KeyFreak shows that a "closed" controller like the KeyStep Mk1 can be turned into a small open synthesis platform. But for me the most valuable part wasn't that it made sound, it was having rebuilt the whole path:
 
 ```text
-identificar el hardware
- → entender el bootloader
- → capturar el protocolo
- → escribir un uploader propio
- → analizar el firmware en Ghidra
- → descubrir la matriz del teclado
- → cargar firmware propio
- → generar audio por Mod CV
- → construir motores de síntesis
+identify the hardware
+ → understand the bootloader
+ → capture the protocol
+ → write a custom uploader
+ → analyze the firmware in Ghidra
+ → discover the keyboard matrix
+ → load custom firmware
+ → generate audio via Mod CV
+ → build synthesis engines
 ```
 
-No reemplaza a ningún sinte comercial moderno, y no pretende hacerlo. El punto es la metodología —inspeccionar, capturar, analizar, equivocarse, documentar y construir de a poco— y dejarla abierta para que otra persona la tome desde donde yo la dejé.
+It doesn't replace any modern commercial synth, and it doesn't try to. The point is the methodology — inspect, capture, analyze, get it wrong, document and build step by step — and to leave it open so someone else can pick it up where I left off.
 
-Si lo replicas, lo mejoras o te quedas pegado en algún paso, los issues y forks son bienvenidos. Para eso lo publico. 🙂
+If you replicate it, improve it or get stuck on a step, issues and forks are welcome. That's why I'm publishing it. 🙂
 
 ---
 
-*Hecho por Eduardo Mansilla como proyecto de aprendizaje sobre firmware embebido, ingeniería inversa y síntesis digital. Sin afiliación con Arturia; las marcas se mencionan solo de forma descriptiva.*
+*Made by Eduardo Mansilla as a learning project on embedded firmware, reverse engineering and digital synthesis. Not affiliated with Arturia; trademarks are mentioned for descriptive purposes only.*

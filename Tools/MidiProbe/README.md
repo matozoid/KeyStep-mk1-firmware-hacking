@@ -1,54 +1,54 @@
 # KeyStep Linux MIDI Probe
 
-Tu KeyStep MK1 en bootloader ya aparece así:
+A KeyStep MK1 in bootloader mode shows up like this:
 
 ```text
 ID 1c75:0208 Arturia KeyStep Updater
 hw:2,0,0 KeyStep Updater MIDI 1
 ```
 
-Eso confirma que el bootloader expone un puerto USB-MIDI en Linux.
+This confirms that the bootloader exposes a USB-MIDI port on Linux.
 
-## Instalar requisito
+## Install requirement
 
 ```bash
 sudo apt install alsa-utils
 ```
 
-## Listar puertos
+## List ports
 
 ```bash
 python3 keystep_bootloader_probe.py --list
 ```
 
-## Probar respuesta segura
+## Test a safe response
 
-Con el KeyStep en bootloader:
+With the KeyStep in bootloader mode:
 
 ```bash
 python3 keystep_bootloader_probe.py --identity
 ```
 
-Esto envía solo el SysEx estándar MIDI Universal Device Inquiry:
+This only sends the standard MIDI Universal Device Inquiry SysEx:
 
 ```text
 F0 7E 7F 06 01 F7
 ```
 
-No escribe firmware.
+It does not write firmware.
 
-## Inspeccionar el .led
+## Inspect the .led
 
 ```bash
 python3 keystep_led_inspect.py keystep_Firmware_Update__1_0_28.led
 ```
 
-## Qué enviar de vuelta
+## What to report back
 
-Pega aquí la salida completa de:
+Share the full output of:
 
 ```bash
 python3 keystep_bootloader_probe.py --identity
 ```
 
-Según la respuesta, definimos si el bootloader acepta comandos SysEx estándar o si hay que descubrir comandos propietarios.
+Depending on the response, we determine whether the bootloader accepts standard SysEx commands or whether proprietary commands need to be discovered.

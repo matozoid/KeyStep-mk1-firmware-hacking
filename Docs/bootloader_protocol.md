@@ -1,29 +1,29 @@
 # Bootloader / uploader protocol
 
-## Entrada al bootloader
+## Entering the bootloader
 
-Modo observado:
+Observed method:
 
 ```text
-Mantener Record + Stop + Play/Pause mientras conectas USB
+Hold Record + Stop + Play/Pause while connecting USB
 ```
 
-## Identificación USB/MIDI observada
+## Observed USB/MIDI identification
 
-En bootloader:
+In bootloader mode:
 
 ```text
 amidi -l: IO hw:2,0,0 KeyStep Updater MIDI 1
 lsusb: ID 1c75:0208 Arturia KeyStep Updater
 ```
 
-En modo normal:
+In normal mode:
 
 ```text
 amidi -l: IO hw:2,0,0 Arturia KeyStep 32 MIDI 1
 ```
 
-## Handshake observado
+## Observed handshake
 
 ```text
 Host → KeyStep:
@@ -33,32 +33,32 @@ KeyStep → Host:
 F0 3F F7
 ```
 
-La secuencia de inicio se envía dos veces.
+The start sequence is sent twice.
 
-## Envío de frames
+## Sending frames
 
-- Archivo `.led`: ASCII hex
-- Frame raw observado: 2078 bytes
-- Frame como ASCII hex: 4156 caracteres
-- Cada payload se manda como SysEx:
+- `.led` file: ASCII hex
+- Observed raw frame: 2078 bytes
+- Frame as ASCII hex: 4156 characters
+- Each payload is sent as SysEx:
 
 ```text
 F0 <ASCII HEX> F7
 ```
 
-ACK de frame:
+Frame ACK:
 
 ```text
 F0 1A F7
 ```
 
-ACK final:
+Final ACK:
 
 ```text
 F0 77 F7
 ```
 
-## Uploader usado
+## Uploader used
 
 ```bash
 python3 tools/uploader/keystep_rawmidi_handshake_uploader.py firmware.led --port hw:2,0,0
