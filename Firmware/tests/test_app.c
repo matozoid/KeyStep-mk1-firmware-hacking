@@ -151,6 +151,46 @@ static void test_shift_channel(void)
     CHECK(app_save_request(&a) & APP_SAVE_SETTINGS);
 }
 
+static void test_chord_mode(void)
+{
+    boot();
+    /* Shift + Hold held: keys are captured (and sound), not taken as Shift + key functions */
+    app_buttons(&a, 1u << APP_BTN_SHIFT);
+    app_buttons(&a, (1u << APP_BTN_SHIFT) | (1u << APP_BTN_HOLD));
+    uint8_t ch_before = settings_get(&a.set, P_USER_CH);
+    app_key(&a, 31, 100); /* 41 */
+    app_key(&a, 27, 100); /* 45 */
+    app_key(&a, 24, 100); /* 48 */
+    app_key(&a, 31, 0);
+    app_key(&a, 27, 0);
+    app_key(&a, 24, 0);
+    CHECK_EQ(settings_get(&a.set, P_USER_CH), ch_before);
+    CHECK_EQ(count(0x90, 41) + count(0x90, 45) + count(0x90, 48), 3);
+    app_buttons(&a, 1u << APP_BTN_SHIFT);
+    app_buttons(&a, 0);
+    CHECK_EQ(a.chord.state, CHORD_ON);
+    CHECK_EQ(a.chord.n, 3);
+
+    /* one key now plays the chord rooted on it */
+    clear();
+    app_key(&a, 19, 90); /* 53 */
+    CHECK_EQ(count(0x90, 53), 1);
+    CHECK_EQ(count(0x90, 57), 1);
+    CHECK_EQ(count(0x90, 60), 1);
+    app_key(&a, 19, 0);
+    CHECK_EQ(count(0x80, 53) + count(0x80, 57) + count(0x80, 60), 3);
+
+    /* Shift + Hold again without keys: chord mode off */
+    app_buttons(&a, 1u << APP_BTN_SHIFT);
+    app_buttons(&a, (1u << APP_BTN_SHIFT) | (1u << APP_BTN_HOLD));
+    app_buttons(&a, 0);
+    CHECK_EQ(a.chord.state, CHORD_OFF);
+    clear();
+    app_key(&a, 19, 90);
+    CHECK_EQ(count(0x90, -1), 1);
+    app_key(&a, 19, 0);
+}
+
 static void test_cv_priority(void)
 {
     boot();
@@ -653,6 +693,7 @@ int main(void)
 {
     test_keys();
     test_shift_channel();
+    test_chord_mode();
     test_cv_priority();
     test_transport_internal();
     test_transpose();

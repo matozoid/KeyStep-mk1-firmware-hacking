@@ -484,7 +484,8 @@ static void key_down(app_t *a, uint8_t k, uint8_t vel)
     if (a->keys_down++ == 0)
         a->at_block = 2;
 
-    if (shift(a)) {
+    /* While a chord is being captured (Shift + Hold held) keys are notes, not Shift functions. */
+    if (shift(a) && a->chord.state != CHORD_CAPTURING) {
         a->key_flags[k] |= KEYF_SHIFT;
         shift_key(a, k);
         return;

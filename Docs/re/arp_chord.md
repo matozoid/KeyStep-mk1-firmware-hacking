@@ -186,7 +186,9 @@ root. Default after boot: {60} only. Not saved to flash.
 - If the new note is lower than entry 0, the old root moves to the new slot and
   the new note becomes entry 0. So the **root is the lowest captured note**,
   not the first one as the manual says.
-- Captured notes are also sounded normally.
+- Captured notes are also sounded normally. Shift is still held during capture, so in this state
+  keys must not act as Shift + key functions (channel, gate, swing). The open firmware first
+  got this wrong: every captured key changed a setting and no chord was stored.
 - Velocity is **not** captured: entries keep 0x40; playback uses the played
   key's velocity anyway.
 
