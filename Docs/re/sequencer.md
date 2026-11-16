@@ -43,7 +43,8 @@ step's tie/legato flag.
 | 1 | On the step that *starts* the tied note | Note-off of step s looks at step s |
 | 0 | On the step that *continues* the note | Note-off of step s looks at step s+1 |
 
-Probably a legacy/compat switch between two firmware generations (?).
+This is the MCC "Tie Mode" setting (0 Tie to Previous, 1 Tie to Next). It also changes what Tap
+does in step record (3.1).
 
 ### 1.4 Defaults
 
@@ -198,11 +199,21 @@ counters, Tap state, real-time buffer, current/next sequence pointers).
   On the first input after arming, the sequence is cleared (length 0, tie convention re-copied).
   If the placeholder flag is set it is cleared and the length restarts at 0.
 - Velocity is stored as played (fixed velocity applies at playback only).
-- Tap:
-  - Tap with no key held → on release writes a rest (0x82/0x40), `len++`.
-  - Tap held while playing a chord → chord is written with the tie bit, the next step is pre-set to
-    rest and `len++` (legato/tie to the next step).
-  - Holding keys and tapping repeatedly extends the note by tie steps.
+- Tap (0x08015794, with the key handler 0x080151c0):
+  - Tap pressed with no key held → "rest pending". On release a rest (0x82/0x40) is written and
+    `len++`. If a chord was entered while Tap was held, no rest is written.
+  - Tap held while the last key goes up (legato entry) → the chord is written with the tie bit,
+    the next step is preset to rest, `len++`. Same in both tie conventions.
+  - Tap with keys held, convention 0 (Tie to Previous): nothing on press. On release the chord is
+    written with the tie bit and `len++`. Releasing the keys then writes nothing. N taps give
+    N steps, all with the tie bit, so the first one also ties to the step before it.
+  - Tap with keys held, convention 1 (Tie to Next): on press the chord is written with the tie
+    bit, the next step is preset to rest and `len++`. Nothing on release. Releasing the keys
+    writes the last step without the tie bit. N taps give N + 1 steps.
+  - Tap pressed with no key, then a key pressed and still held when Tap goes up: a rest is
+    written first, the chord follows as a normal step when the key goes up.
+  - Stock bug: with `len` = 63 the "preset next step" write lands on offset 0x400 (the length
+    byte) before `len++`.
 - Recording stops at 64 steps.
 - Delete last step: `len−1`; below 2 it resets to the placeholder (1 rest step).
 

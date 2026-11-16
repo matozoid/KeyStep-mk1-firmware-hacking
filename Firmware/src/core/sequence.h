@@ -60,7 +60,9 @@ typedef struct {
     uint8_t held;       /* keys currently down */
     uint8_t started;    /* first input since arming seen */
     uint8_t tap_held;
-    uint8_t tie_written; /* keys held while tapping: chord already written with tie */
+    uint8_t tap_mark;     /* Tap went down and no step was written since */
+    uint8_t rest_pending; /* Tap went down with no key held */
+    uint8_t tie_written;  /* Tap released with keys held: chord already written with tie */
     uint8_t tie_conv_default;
 } step_rec_t;
 

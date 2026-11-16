@@ -132,6 +132,8 @@ void step_rec_arm(step_rec_t *r, sequence_t *seq, uint8_t tie_conv_default)
     r->held = 0;
     r->started = 0;
     r->tap_held = 0;
+    r->tap_mark = 0;
+    r->rest_pending = 0;
     r->tie_written = 0;
     r->tie_conv_default = tie_conv_default;
 }
@@ -149,15 +151,6 @@ static void step_rec_begin(step_rec_t *r)
     s->flags &= (uint8_t)~SEQ_FLAG_PLACEHOLDER;
 }
 
-static void step_rec_commit(step_rec_t *r, int tie)
-{
-    sequence_t *s = r->seq;
-    if (s->length >= SEQ_STEPS)
-        return;
-    seq_set_step(s, s->length, r->notes, r->vels, r->n, tie);
-    s->length++;
-}
-
 void step_rec_note_on(step_rec_t *r, uint8_t note, uint8_t vel)
 {
     step_rec_begin(r);
@@ -172,46 +165,71 @@ void step_rec_note_on(step_rec_t *r, uint8_t note, uint8_t vel)
     }
 }
 
+/* Write the collected chord to the next step (stock 0x080151c0 / 0x08015794). With `tie` the step
+ * carries the tie bit and the step after it is preset to a rest. */
+static void step_rec_write(step_rec_t *r, int tie)
+{
+    sequence_t *s = r->seq;
+    if (s->length >= SEQ_STEPS)
+        return;
+    seq_set_step(s, s->length, r->notes, r->vels, r->n, tie);
+    s->length++;
+    if (tie && s->length < SEQ_STEPS)
+        seq_set_rest(s, s->length, 100);
+    r->tap_mark = 0;
+}
+
 void step_rec_note_off(step_rec_t *r, uint8_t note)
 {
     (void)note;
     if (r->held)
         r->held--;
     if (r->held == 0 && r->n) {
-        if (!r->tie_written)
-            step_rec_commit(r, 0);
-        else
+        if (!r->tie_written) {
+            /* Tap held while the keys go up: legato entry, the step gets the tie bit. */
+            if (r->tap_held)
+                r->rest_pending = 0;
+            step_rec_write(r, r->tap_held);
+        } else {
+            r->rest_pending = 0;
             r->seq->flags |= SEQ_FLAG_DIRTY;
+        }
         r->n = 0;
         r->tie_written = 0;
     }
 }
 
+/* Tap in step record, as stock 0x08015794.
+ *  - No key held: a rest is written when Tap is released, unless a chord was entered meanwhile.
+ *  - Keys held, Tie to Previous (convention 0): each Tap release writes the chord with the tie
+ *    bit; releasing the keys adds nothing. N taps give N steps.
+ *  - Keys held, Tie to Next (convention 1): each Tap press writes the chord with the tie bit;
+ *    releasing the keys adds the last step without it. N taps give N + 1 steps. */
 void step_rec_tap(step_rec_t *r, int pressed)
 {
     step_rec_begin(r);
     sequence_t *s = r->seq;
     if (pressed) {
         r->tap_held = 1;
-        if (r->held && r->n && s->length < SEQ_STEPS) {
-            if (!r->tie_written) {
-                /* chord tied into the next step */
-                step_rec_commit(r, s->tie_conv == 1);
-                r->tie_written = 1;
-            }
-            if (s->length < SEQ_STEPS) {
-                /* extend by one tie step */
-                seq_set_step(s, s->length, r->notes, r->vels, r->n, 1);
-                s->step[s->length][0].vel |= SEQ_VEL_TIE_FLAG;
-                s->length++;
-            }
+        r->tap_mark = s->length < SEQ_STEPS;
+        if (!r->held || !r->n) {
+            r->rest_pending = 1;
+        } else if (s->tie_conv == 1 && s->length < SEQ_STEPS) {
+            r->rest_pending = 0;
+            step_rec_write(r, 1);
         }
         return;
     }
-    if (r->tap_held && !r->held && !r->tie_written && s->length < SEQ_STEPS) {
+    if (r->rest_pending && s->length < SEQ_STEPS) {
+        r->rest_pending = 0;
         seq_set_rest(s, s->length, 0x40);
         s->length++;
+    } else if (r->tap_mark && r->n && s->length < SEQ_STEPS) {
+        seq_set_step(s, s->length, r->notes, r->vels, r->n, 1);
+        s->length++;
+        r->tie_written = 1;
     }
+    r->tap_mark = 0;
     r->tap_held = 0;
 }
 

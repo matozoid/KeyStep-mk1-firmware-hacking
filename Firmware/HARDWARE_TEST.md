@@ -26,6 +26,8 @@ Confirmed on a real unit:
 - Rate knob 30–240 BPM; Seq/Arp switch; arp with a held chord; step record and playback.
 - Sequences stored by the stock firmware play with the same notes, velocities and swing.
 - Recorded steps survive a power cycle.
+- Step record with Tap (Tie to Previous): rest, a held key with two taps giving one note over two
+  steps, and legato entry with Tap held. Tie to Next is covered by the host tests only.
 - Updater entry over SysEx (flag + reset) and with the button combo.
 
 Known and open:

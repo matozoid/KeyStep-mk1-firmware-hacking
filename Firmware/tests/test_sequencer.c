@@ -177,21 +177,67 @@ static void test_step_record(void)
     CHECK_EQ(s.length, 2);
     CHECK(seq_step_is_rest(&s, 1));
 
-    /* hold a key and tap twice: note + two tie steps */
+    /* Tie to Previous: hold a key and tap twice gives two steps, both with the tie bit */
     step_rec_note_on(&r, 67, 100);
     step_rec_tap(&r, 1);
+    CHECK_EQ(s.length, 2);
     step_rec_tap(&r, 0);
+    CHECK_EQ(s.length, 3);
     step_rec_tap(&r, 1);
     step_rec_tap(&r, 0);
     step_rec_note_off(&r, 67);
-    CHECK_EQ(s.length, 5);
+    CHECK_EQ(s.length, 4);
     CHECK_EQ(s.step[2][0].note, 67);
-    CHECK(!(s.step[2][0].vel & SEQ_VEL_TIE_FLAG));
+    CHECK_EQ(s.step[3][0].note, 67);
+    CHECK(s.step[2][0].vel & SEQ_VEL_TIE_FLAG);
     CHECK(s.step[3][0].vel & SEQ_VEL_TIE_FLAG);
-    CHECK(s.step[4][0].vel & SEQ_VEL_TIE_FLAG);
 
+    /* legato: hold Tap, play two notes, release Tap: two tied steps and no rest */
+    step_rec_tap(&r, 1);
+    step_rec_note_on(&r, 60, 100);
+    step_rec_note_off(&r, 60);
+    step_rec_note_on(&r, 62, 100);
+    step_rec_note_off(&r, 62);
+    step_rec_tap(&r, 0);
+    CHECK_EQ(s.length, 6);
+    CHECK_EQ(s.step[4][0].note, 60);
+    CHECK_EQ(s.step[5][0].note, 62);
+    CHECK(s.step[4][0].vel & SEQ_VEL_TIE_FLAG);
+    CHECK(s.step[5][0].vel & SEQ_VEL_TIE_FLAG);
+
+    /* a plain note after that has no tie bit */
+    step_rec_note_on(&r, 64, 100);
+    step_rec_note_off(&r, 64);
+    CHECK_EQ(s.length, 7);
+    CHECK(!(s.step[6][0].vel & SEQ_VEL_TIE_FLAG));
+    step_rec_delete_last(&r);
+    step_rec_delete_last(&r);
     step_rec_delete_last(&r);
     CHECK_EQ(s.length, 4);
+
+    /* Tie to Next: each Tap press writes a tied step, key release adds the untied last step */
+    {
+        sequence_t s1;
+        step_rec_t r1;
+        seq_init_empty(&s1, 1);
+        step_rec_arm(&r1, &s1, 1);
+        step_rec_note_on(&r1, 67, 100);
+        step_rec_tap(&r1, 1);
+        CHECK_EQ(s1.length, 1);
+        step_rec_tap(&r1, 0);
+        CHECK_EQ(s1.length, 1);
+        step_rec_tap(&r1, 1);
+        step_rec_tap(&r1, 0);
+        step_rec_note_off(&r1, 67);
+        CHECK_EQ(s1.length, 3);
+        CHECK(s1.step[0][0].vel & SEQ_VEL_TIE_FLAG);
+        CHECK(s1.step[1][0].vel & SEQ_VEL_TIE_FLAG);
+        CHECK(!(s1.step[2][0].vel & SEQ_VEL_TIE_FLAG));
+        CHECK_EQ(s1.step[2][0].note, 67);
+    }
+
+    step_rec_delete_last(&r);
+    CHECK_EQ(s.length, 3);
     CHECK(s.flags & SEQ_FLAG_DIRTY);
 }
 
