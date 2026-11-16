@@ -84,6 +84,7 @@ typedef struct {
     uint8_t seq_index;    /* 0..7 */
     uint8_t knob_mode, knob_div; /* detent 0..7 */
     uint8_t pend_mode, pend_div; /* positions to apply on Shift release */
+    uint8_t cand_mode, cand_div, cnt_mode, cnt_div; /* detent debounce: position being timed */
     uint8_t div_index;    /* seq_division_ticks() index */
     int8_t octave;        /* -4..+4 */
     int8_t arp_range;     /* -3..+3 */

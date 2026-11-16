@@ -104,6 +104,14 @@ static int find(uint8_t status, int d1)
     return -1;
 }
 
+static int find_last(uint8_t status, int d1)
+{
+    for (int i = n_out - 1; i >= 0; i--)
+        if (out[i].m[0] == status && (d1 < 0 || out[i].m[1] == d1))
+            return i;
+    return -1;
+}
+
 /* ---- tests ---- */
 
 static void test_keys(void)
@@ -425,6 +433,13 @@ static void test_sync_external(void)
     CHECK_EQ(a.transport, TR_ARMED);
 }
 
+/* a knob position counts after it has been read 20 times in a row */
+static void knobs(uint16_t tempo, uint16_t mode, uint16_t timediv)
+{
+    for (int i = 0; i < 20; i++)
+        app_knobs(&a, tempo, mode, timediv);
+}
+
 static void ext_clock(unsigned n)
 {
     for (unsigned i = 0; i < n; i++) {
@@ -718,18 +733,24 @@ static void test_knobs(void)
 {
     boot();
     /* stock detent windows: position 7 at the low end, 0 at the top, gaps keep the last one */
-    app_knobs(&a, 2048, 0xFFF, 0x1D6); /* mode 0, division 7 (1/32T) */
+    knobs(2048, 0xFFF, 0x1D6); /* mode 0, division 7 (1/32T) */
     CHECK_EQ(a.seq_index, 0);
     CHECK_EQ(a.div_index, 7);
-    app_knobs(&a, 2048, 0x86B, 0xA6E); /* mode 3, division 2 (1/16) */
+    knobs(2048, 0x86B, 0xA6E); /* mode 3, division 2 (1/16) */
     CHECK_EQ(a.seq_index, 3);
     CHECK_EQ(a.div_index, 2);
-    app_knobs(&a, 2048, 0x7A0, 0xB80); /* both in gaps: unchanged */
+    knobs(2048, 0x7A0, 0xB80); /* both in gaps: unchanged */
+    CHECK_EQ(a.seq_index, 3);
+    CHECK_EQ(a.div_index, 2);
+    /* turning to the next notch: the open wiper falls through the window of position 7 */
+    for (int i = 0; i < 19; i++)
+        app_knobs(&a, 2048, 0x1D6, 0x1D6);
+    knobs(2048, 0, 0);
     CHECK_EQ(a.seq_index, 3);
     CHECK_EQ(a.div_index, 2);
     /* Shift defers the change until release */
     app_buttons(&a, 1u << APP_BTN_SHIFT);
-    app_knobs(&a, 2048, 0x1D6, 0xCDE);
+    knobs(2048, 0x1D6, 0xCDE);
     CHECK_EQ(a.seq_index, 3);
     app_buttons(&a, 0);
     CHECK_EQ(a.seq_index, 7);
@@ -746,29 +767,29 @@ static void test_cmd(uint8_t b7, uint8_t b8, uint8_t idx, uint8_t v)
 static void test_fine_tempo(void)
 {
     boot();
-    app_knobs(&a, 1820, 0xFFF, 0x1D6);
+    knobs(1820, 0xFFF, 0x1D6);
     CHECK_EQ(a.clk.bpm100, 12333);
     app_buttons(&a, 1u << APP_BTN_SHIFT);
-    app_knobs(&a, 1900, 0xFFF, 0x1D6); /* first movement only captures 123.00 */
+    knobs(1900, 0xFFF, 0x1D6); /* first movement only captures 123.00 */
     CHECK_EQ(a.clk.bpm100, 12333);
-    app_knobs(&a, 2048, 0xFFF, 0x1D6); /* centre */
+    knobs(2048, 0xFFF, 0x1D6); /* centre */
     CHECK_EQ(a.clk.bpm100, 12300);
-    app_knobs(&a, 2300, 0xFFF, 0x1D6);
+    knobs(2300, 0xFFF, 0x1D6);
     CHECK_EQ(a.clk.bpm100, 12400);
-    app_knobs(&a, 4095, 0xFFF, 0x1D6);
+    knobs(4095, 0xFFF, 0x1D6);
     CHECK_EQ(a.clk.bpm100, 13300);
-    app_knobs(&a, 0, 0xFFF, 0x1D6);
+    knobs(0, 0xFFF, 0x1D6);
     CHECK_EQ(a.clk.bpm100, 11300);
     app_buttons(&a, 0);
     app_buttons(&a, 1u << APP_BTN_SHIFT); /* base survives releasing Shift */
-    app_knobs(&a, 4095, 0xFFF, 0x1D6);
+    knobs(4095, 0xFFF, 0x1D6);
     CHECK_EQ(a.clk.bpm100, 13300);
     app_buttons(&a, 0);
-    app_knobs(&a, 2100, 0xFFF, 0x1D6); /* plain knob: full range again */
+    knobs(2100, 0xFFF, 0x1D6); /* plain knob: full range again */
     CHECK_EQ(a.clk.bpm100, 13769);
     app_buttons(&a, 1u << APP_BTN_SHIFT); /* new base 137.00 */
-    app_knobs(&a, 2200, 0xFFF, 0x1D6);
-    app_knobs(&a, 0, 0xFFF, 0x1D6);
+    knobs(2200, 0xFFF, 0x1D6);
+    knobs(0, 0xFFF, 0x1D6);
     CHECK_EQ(a.clk.bpm100, 12700);
     app_buttons(&a, 0);
 }
@@ -776,7 +797,7 @@ static void test_fine_tempo(void)
 static void test_factory_mode(void)
 {
     boot();
-    app_knobs(&a, 2000, 0, 0);
+    knobs(2000, 0, 0);
     tap(APP_BTN_PLAY);
     CHECK_EQ(a.transport, TR_PLAYING);
     clear();
@@ -813,12 +834,12 @@ static void test_factory_mode(void)
 
     /* knobs, switches, pedal, strips, DC jack */
     clear();
-    app_knobs(&a, 4095, 0x200, 4095);
+    knobs(4095, 0x200, 4095);
     CHECK_EQ(out[find(0xB0, 0x66)].m[2], 127);
-    CHECK_EQ(out[find(0xB0, 0x15)].m[2], 8);
-    CHECK_EQ(out[find(0xB0, 0x68)].m[2], 1);
+    CHECK_EQ(out[find_last(0xB0, 0x15)].m[2], 8); /* after the position has settled */
+    CHECK_EQ(out[find_last(0xB0, 0x68)].m[2], 1);
     clear();
-    app_knobs(&a, 4090, 0x200, 4095); /* within hysteresis */
+    knobs(4090, 0x200, 4095); /* within hysteresis */
     CHECK_EQ(count(0xB0, 0x66), 0);
     app_switches(&a, APP_SYNC_IN, 0);
     CHECK_EQ(out[find(0xB0, 0x13)].m[2], 2);

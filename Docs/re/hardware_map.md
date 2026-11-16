@@ -100,6 +100,11 @@ which are not evenly spaced:
 | 0 | ≥ 0xF9C |
 | 8 (none) | anything else |
 
+Measured on a unit: in a notch the reading sits near the middle of its window with about 60 counts
+of noise. Between two notches the wiper is open and the reading falls to 0, so it passes through
+the window of position 7 on every turn. The
+18-reading rule below filters that out.
+
 A position counts only after 18 equal readings in a row (0x08011a04). Position 8 is ignored by
 both knob handlers. The time-division position is used directly as the division index
 (sequencer.md 2.2); the mode-knob position is the sequence or arp mode index.

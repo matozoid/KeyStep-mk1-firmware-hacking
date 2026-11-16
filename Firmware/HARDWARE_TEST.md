@@ -44,6 +44,17 @@ Confirmed on a real unit:
   while following are not tested on hardware.
 - Master stop and continue with a USB clock from the PC: a stop in the middle of the sequence
   paused, a continue resumed at the paused step, and a start began again at the first step.
+- Editor protocol, driven by a script that sends what the vendor editor sends (the editor itself
+  does not find the device under Wine): identity; every one of the 48 global settings in the
+  editor's device definition written and read back over its whole value list or range (158
+  pairs); all 8 sequences read; a 64-step pattern with chords of up to 8 notes, ties and rests
+  written and read back; single-value edits; other sequences untouched. Replies arrive within
+  6 ms. 64 requests sent back to back are all answered (the host is held off while the reply
+  queue is full). A block write drops a rest hidden beyond the sequence length, as stock does.
+  The real editor on Windows or macOS is still untested.
+- Mode and Time Div knobs: turning from notch to notch and resting between notches no longer
+  jumps to position 7 (the open wiper reads 0 and passes that window); a position is taken after
+  20 equal readings.
 - Updater entry over SysEx (flag + reset) and with the button combo.
 
 Known and open:
@@ -53,7 +64,7 @@ Known and open:
   of the host log, and the worst gap seen is 43 ms. A page erase still stops the CPU for 20-40 ms;
   that cannot be avoided on this chip.
 - Flipping the Seq/Arp switch while playing sends Stop and Start 2 ms apart. Compare with stock.
-- Not exercised yet: sections 3 to 5 below, pedal, DIN MIDI, sync, MCC.
+- Not exercised yet: sections 3 to 5 below, pedal, DIN MIDI, sync, the real MCC application.
 
 ## 1. First boot
 

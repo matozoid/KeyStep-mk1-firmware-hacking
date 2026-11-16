@@ -681,18 +681,32 @@ void app_key(app_t *a, uint8_t key, uint8_t velocity)
  * ------------------------------------------------------------------------------------------- */
 
 /* Detent knobs (hardware_map.md 4): the pot reads unevenly spaced voltages, position 7 at the
- * low end and 0 at the top. Readings between the windows keep the previous position, which also
- * gives the hysteresis. */
-static uint8_t detent(uint8_t prev, uint16_t raw)
+ * low end and 0 at the top. Readings between the windows keep the previous position.
+ *
+ * Between two notches the wiper is open and the reading drops to zero, passing through the
+ * window of position 7 on the way. So a position only counts after it has been read on
+ * DETENT_STABLE calls in a row (stock: 18 equal readings, 0x08011a04). */
+#define DETENT_STABLE 20u
+
+static uint8_t detent(uint8_t prev, uint16_t raw, uint8_t *cand, uint8_t *count)
 {
     static const uint16_t lo[7] = {0x173, 0x317, 0x4AA, 0x647, 0x808, 0xA0B, 0xC7B};
     static const uint16_t hi[7] = {0x239, 0x3DD, 0x570, 0x70D, 0x8CE, 0xAD1, 0xD41};
+    uint8_t pos = 0xFF;
     if (raw >= 0xF9C)
-        return 0;
+        pos = 0;
     for (unsigned i = 0; i < 7; i++)
         if (raw >= lo[i] && raw <= hi[i])
-            return (uint8_t)(7u - i);
-    return prev;
+            pos = (uint8_t)(7u - i);
+    if (pos != *cand) {
+        *cand = pos;
+        *count = 0;
+    }
+    if (pos == 0xFF)
+        return prev;
+    if (*count < DETENT_STABLE && ++*count < DETENT_STABLE)
+        return prev;
+    return pos;
 }
 
 static void apply_mode_knob(app_t *a)
@@ -832,7 +846,8 @@ static void apply_div_knob(app_t *a)
 
 void app_knobs(app_t *a, uint16_t tempo, uint16_t mode, uint16_t timediv)
 {
-    uint8_t m = detent(a->pend_mode, mode), d = detent(a->pend_div, timediv);
+    uint8_t m = detent(a->pend_mode, mode, &a->cand_mode, &a->cnt_mode);
+    uint8_t d = detent(a->pend_div, timediv, &a->cand_div, &a->cnt_div);
     a->pend_mode = m;
     a->pend_div = d;
     if (a->test_mode) {
