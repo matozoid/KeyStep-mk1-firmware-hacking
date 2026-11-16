@@ -14,7 +14,7 @@ in the application image (linked at `0x08004000`). Function names are the ones i
 | Application | `0x08004000`, VTOR set in SystemInit | vector table |
 | Clock | HSE 8 MHz × 9 = 72 MHz, APB1 /2, flash latency 2, USB 48 MHz | `SystemClock_Config` 0x0800cd94 |
 | SysTick | 10 kHz (100 µs tick, counter at 0x20000070): software timers, key velocity timing, LED blink | 0x08009d44 |
-| Watchdog | IWDG, reload 0xFFF | 0x08009600 |
+| Watchdog | IWDG, reload 0xFFF. Started by the application, not by the bootloader: the open firmware never starts or feeds it and runs without resets | 0x08009600 |
 
 ## Flash layout used by the app
 
@@ -23,7 +23,7 @@ in the application image (linked at `0x08004000`). Function names are the ones i
 | `0x0803B000 + n*0x800`, n=0..7 | 8 × 2 KB | 8 sequences (RAM copies at `0x200022C8 + n*0x408`) | `seq_flash_is_empty` 0x08015c08, `seq_flash_erase_all` 0x08015bd0 |
 | `0x0803F000` | 0x80 bytes | global settings → RAM `0x20005084` | 0x08015cd0 |
 | `0x0803F200` | 4 bytes | touch-strip calibration: pitch hi, pitch lo, mod hi, mod lo (default 0xBF/0x09) — see [settings.md](settings.md) §7 | 0x08015eb8 |
-| `0x0803F800` | 8 bytes | bootloader request flag `0xA33A95FF, 0xAAA55A55`, written by SysEx `'&'` (?) | 0x08015c80 |
+| `0x0803F800` | 8 bytes | bootloader request flag `0xA33A95FF, 0xAAA55A55`, written by SysEx `'&'`; the bootloader stays in update mode when it finds it (confirmed on hardware, sysex.md §8) | 0x08015c80 |
 
 Holding both octave buttons at power-on is the factory reset (manual 3.1.7: resets everything). It
 erases the sequence pages and rewrites the settings page with an erased first word, so settings return

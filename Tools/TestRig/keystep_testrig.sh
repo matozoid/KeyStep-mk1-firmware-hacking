@@ -12,8 +12,9 @@
 #
 # Steps:
 #  0. (--flash) validates the image, asks you to start the KeyStep in bootloader mode
-#     (hold Record + Stop + Play while plugging in USB), uploads it over SysEx with
-#     Tools/Uploader, then asks you to replug normally.
+#     (done over SysEx when a firmware is running; otherwise hold Record + Stop + Play
+#     while plugging in USB), uploads it over SysEx with Tools/Uploader, then waits for
+#     the KeyStep to restart.
 #  1. Waits for the KeyStep (normal mode) on USB and logs its USB descriptors.
 #  2. Sends a MIDI Identity Request and logs the SysEx reply (firmware version).
 #  3. Starts FluidSynth (TiMidity++ fallback) as an ALSA sequencer synth and routes the KeyStep into it,
@@ -51,14 +52,16 @@ LOG="$LOGDIR/session-$STAMP.log"
 SF2=${SF2:-/usr/share/sounds/sf2/FluidR3_GM.sf2}
 VENDOR=1c75            # Arturia
 UPDATER_PID=0208       # KeyStep Updater (bootloader mode)
+OPEN_ID=1209:0001      # open firmware (Firmware/, default build)
 UPLOADER=Tools/Uploader/keystep_rawmidi_handshake_uploader.py
 PACKER=Tools/Ledpacker/make_keystep_custom_led.py
 
 log() { echo "$*" | tee -a "$LOG"; }
 
 usb_updater() { lsusb -d "$VENDOR:$UPDATER_PID" 2>/dev/null; }
-usb_normal()  { lsusb -d "$VENDOR:" 2>/dev/null | grep -v -i "$VENDOR:$UPDATER_PID"; }
-usb_any()     { lsusb -d "$VENDOR:" 2>/dev/null; }
+usb_all()     { lsusb -d "$VENDOR:" 2>/dev/null; lsusb -d "$OPEN_ID" 2>/dev/null; }
+usb_normal()  { usb_all | grep -v -i "$VENDOR:$UPDATER_PID"; }
+usb_any()     { usb_all | grep -q .; }
 
 wait_unplugged() {
     if usb_any >/dev/null; then
@@ -96,6 +99,15 @@ if [ -n "$FLASH" ]; then
         [ "$ans" = flash ] || { log "cancelled"; exit 1; }
     fi
 
+    # A running firmware (stock or open) enters the updater by itself on the updater handshake.
+    if ! usb_updater >/dev/null && usb_normal >/dev/null; then
+        RAW=$(amidi -l | awk 'tolower($0) ~ /keystep/ && tolower($0) !~ /updater/ {print $2; exit}')
+        if [ -n "$RAW" ]; then
+            log "== asking the running firmware to enter the updater ($RAW)"
+            amidi -p "$RAW" -S 'F0 5A 57 6E 28 3C 4E 3F F7' 2>&1 | tee -a "$LOG"
+            for _ in $(seq 20); do usb_updater >/dev/null && break; sleep 0.5; done
+        fi
+    fi
     if ! usb_updater >/dev/null; then
         wait_unplugged
         log "== hold RECORD + STOP + PLAY and plug the KeyStep in (bootloader mode) ..."
@@ -128,8 +140,9 @@ if [ -n "$FLASH" ]; then
     log "== flash OK"
     [ "$FLASH_ONLY" -eq 1 ] && exit 0
 
-    wait_unplugged
-    log "== plug the KeyStep in normally (no buttons held) ..."
+    # The updater restarts into the new firmware by itself after the last frame.
+    log "== waiting for the KeyStep to restart (replug it if nothing happens) ..."
+    while usb_updater >/dev/null; do sleep 0.3; done
 fi
 
 # --- 1. wait for device -------------------------------------------------------

@@ -220,6 +220,13 @@ The reply is built by `sysex_identity_handler` 0x080129cc and sent via `sysex_se
 | Trigger | The raw byte sequence `F0 5A 57 6E 28 3C 4E 3F` (signature at 0x08019BE4). It is not an Arturia-format frame. |
 | Parser result | internal cmd 0x26 (`'&'`) |
 | Action | `bootloader_flag_write` erases page `0x0803F800` and programs the two words 0xA33A95FF, 0xAAA55A55 (from 0x0801A27A) |
-| Reset | No reset in this path was found. The host is probably expected to power-cycle the unit, or a reset happens elsewhere (?). |
+| Reset | No reset in this path was found in the stock code (?). |
 
-The bootloader at 0x08000000 is presumed to check those words at power-up and stay in update mode (?). An open firmware must keep this behaviour if it wants MCC-based updates and recovery.
+Confirmed on hardware with the open firmware:
+
+- The bootloader at 0x08000000 checks those words after any reset and stays in update mode. Writing the flag and then doing a software reset (`SCB->AIRCR` SYSRESETREQ) brings the unit up as `1c75:0208 KeyStep Updater` about one second later, with no power cycle.
+- The Record + Stop + Play combo at power-up is handled by the bootloader itself. It works with the open firmware installed, so a broken application can always be replaced. All three buttons must be down before USB power arrives.
+- In update mode the Hold, Oct−, Oct+ and Shift LEDs run a light show.
+- After the final frame is ACKed (`F0 77 F7`) the bootloader starts the new application by itself. No replug is needed.
+
+An open firmware must keep the flag behaviour if it wants MCC-based updates.

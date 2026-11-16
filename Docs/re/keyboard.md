@@ -18,7 +18,7 @@ SysTick runs at **10 kHz**, not 1 kHz as hardware_map.md says. SystemClock_Confi
 
 ### Matrix and note numbers
 - There are 4 groups of 8 keys. Group g reads matrix line 2g (first contact, "c1") and line 2g+1 (second contact, "c2"). Readers: 0x08016f3c / 0x08016f4e → 0x08011b4a.
-- Key index k runs 0..31. Note = 72 − k + octave·12 (+ transpose, see 4). So k=0 is the top key (C, 72 at octave 0) and k=31 is the bottom key (41). The matrix driver (select 0x080165ea drives PE(8+line) low, read 0x080165b8 returns the inverted PD8–PD15) and the indexing k = 8g + bit are the same in the open firmware, so it maps every key to the same note as stock. Only the physical position of each index is unconfirmed (?).
+- Key index k runs 0..31. Note = 72 − k + octave·12 (+ transpose, see 4). So k=0 is the top key (C, 72 at octave 0) and k=31 is the bottom key (41). The matrix driver (select 0x080165ea drives PE(8+line) low, read 0x080165b8 returns the inverted PD8–PD15) and the indexing k = 8g + bit are the same in the open firmware, so it maps every key to the same note as stock. Confirmed on hardware with the open firmware: the keys send 41 (leftmost) to 72 (rightmost) at octave 0, so k=0 is the rightmost key.
 - The note-on stores the octave offset (kb+0x24+k) and the MIDI channel (kb+0x267+k) for that key. The matching note-off uses those stored values, so an octave or channel change while a key is held never strands notes.
 - A computed note below 0 is skipped (octave −4 on the lowest keys). The top is not clamped: the highest is 72+48 = 120.
 
@@ -242,4 +242,3 @@ When settings+0xA9 is set, the strips and pedal report through 0x0801107c / 0x08
 - Real main-loop (scan) rate. Measure on hardware.
 - Hold/pedal mode value 0/1 vs the MCC "Gate/Toggle" labels.
 - Purpose of flag 0x20000068 and bit 0x100 at +0x80c.
-- Whether the top key is index 0 / note 72 (pin order).

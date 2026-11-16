@@ -78,5 +78,6 @@ quirk not worth copying.
 ## Related finding: bootloader request flag
 
 SysEx command `'&'` (handler 0x080120c4) calls 0x08015c80, which writes the two words
-`0xA33A95FF, 0xAAA55A55` to flash at **0x0803F800**. This is most likely the "enter updater on next
-boot" flag read by the bootloader, i.e. a way to reach update mode without the button combo (?).
+`0xA33A95FF, 0xAAA55A55` to flash at **0x0803F800**. This is the "enter updater" flag read by the
+bootloader after a reset, i.e. a way to reach update mode without the button combo (confirmed on
+hardware, sysex.md §8).

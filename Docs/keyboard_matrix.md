@@ -30,7 +30,7 @@ static uint8_t scan_row(uint8_t row)
 
 ## Contact mapping
 
-For `key` 0–31 (0 = lowest):
+For `key` 0–31 (0 = highest key, the top C; 31 = lowest key, the bottom F; confirmed on hardware):
 
 ```text
 group  = key / 8
