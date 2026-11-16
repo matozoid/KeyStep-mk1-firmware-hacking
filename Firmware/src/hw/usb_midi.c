@@ -108,6 +108,8 @@ static volatile uint8_t ep1_busy;
 #define RXQ_PKTS 32u
 static uint8_t rxq[RXQ_PKTS][4];
 static volatile uint8_t rxq_head, rxq_tail;
+static volatile uint8_t rx_paused; /* EP2 left in NAK until the queue has room for a full packet */
+#define RX_PKTS_PER_TRANSFER (EP_MIDI_SIZE / 4u)
 
 /* ---- EPnR helpers (toggle bits are written as XOR, CTR bits written 1 to keep) ---- */
 static void ep_set_stat_tx(unsigned ep, uint32_t stat)
@@ -303,6 +305,7 @@ static void usb_reset(void)
     configured = 0;
     pending_addr = 0;
     ep1_busy = 0;
+    rx_paused = 0;
     USB_DADDR = 0x80u;
 }
 
@@ -363,7 +366,12 @@ static void handle_ctr(void)
                     rxq[rxq_head % RXQ_PKTS][k] = buf[i + k];
                 rxq_head++;
             }
-            ep_set_stat_rx(2, STAT_VALID);
+            /* Take the next transfer only when all of it fits, so the host is held off (NAK)
+             * instead of losing data. usb_midi_receive() opens the endpoint again. */
+            if (RXQ_PKTS - (uint8_t)(rxq_head - rxq_tail) >= RX_PKTS_PER_TRANSFER)
+                ep_set_stat_rx(2, STAT_VALID);
+            else
+                rx_paused = 1;
         } else {
             /* unexpected: clear both flags */
             USB_EPR(ep) = epr & EP_RW_MASK & ~(EP_CTR_RX | EP_CTR_TX);
@@ -436,5 +444,23 @@ int usb_midi_receive(uint8_t pkt[4])
     for (int k = 0; k < 4; k++)
         pkt[k] = rxq[rxq_tail % RXQ_PKTS][k];
     rxq_tail++;
+    if (rx_paused && RXQ_PKTS - (uint8_t)(rxq_head - rxq_tail) >= RX_PKTS_PER_TRANSFER) {
+        uint32_t pm = irq_save();
+        if (rx_paused) {
+            rx_paused = 0;
+            ep_set_stat_rx(2, STAT_VALID);
+        }
+        irq_restore(pm);
+    }
     return 1;
+}
+
+unsigned usb_midi_tx_room(void)
+{
+    return TXQ_PKTS - (uint8_t)(txq_head - txq_tail);
+}
+
+unsigned usb_midi_tx_sent(void)
+{
+    return txq_tail;
 }

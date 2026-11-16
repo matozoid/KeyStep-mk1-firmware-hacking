@@ -52,6 +52,23 @@ static void usb_packet(void *ctx, const uint8_t pkt[4])
     usb_midi_send_packet(pkt);
 }
 
+/* A request is only taken from USB when its reply fits in the send queue; until then the host is
+ * held off, so an editor that sends requests back to back loses no replies. A host that sends but
+ * never reads (send queue not moving for 30 ms) is not waited for. */
+#define USB_REPLY_PKTS 44u /* longest reply (100-byte block) plus the ACK */
+
+static int usb_rx_allowed(void)
+{
+    static unsigned sent;
+    static uint32_t moved_ms;
+    uint32_t now = millis();
+    if (usb_midi_tx_sent() != sent || usb_midi_tx_room() >= USB_REPLY_PKTS) {
+        sent = usb_midi_tx_sent();
+        moved_ms = now;
+    }
+    return usb_midi_tx_room() >= USB_REPLY_PKTS || now - moved_ms > 30u;
+}
+
 static void io_sysex(void *ctx, const uint8_t *d, uint16_t len)
 {
     (void)ctx;
@@ -338,7 +355,7 @@ int main(void)
             midi_parser_feed(&din_parser, byte, &din_cb);
 
         uint8_t pkt[4];
-        while (usb_midi_receive(pkt)) {
+        while (usb_rx_allowed() && usb_midi_receive(pkt)) {
             uint8_t n = usb_midi_packet_len(pkt);
             for (uint8_t i = 0; i < n; i++)
                 midi_parser_feed(&usb_parser, pkt[1 + i], &usb_cb);
