@@ -151,6 +151,11 @@ static void step_rec_begin(step_rec_t *r)
     s->flags &= (uint8_t)~SEQ_FLAG_PLACEHOLDER;
 }
 
+void step_rec_start(step_rec_t *r)
+{
+    step_rec_begin(r);
+}
+
 void step_rec_note_on(step_rec_t *r, uint8_t note, uint8_t vel)
 {
     step_rec_begin(r);

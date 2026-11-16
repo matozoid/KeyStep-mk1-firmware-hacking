@@ -477,12 +477,53 @@ static void shift_key(app_t *a, uint8_t k)
     }
 }
 
+/* What Rec + channel keys edits: 1 the current sequence, 2 the Pattern random arp loop, 0 nothing. */
+static int rec_length_target(const app_t *a)
+{
+    if (!a->arp_mode)
+        return 1;
+    return a->arp.mode == ARP_RANDOM && a->arp.random_variant == 1 ? 2 : 0;
+}
+
+static void rec_length_apply(app_t *a)
+{
+    unsigned len = a->rec_len;
+    a->rec_len = 0;
+    switch (rec_length_target(a)) {
+    case 1: {
+        sequence_t *s = &a->seq[a->seq_index];
+        /* Freshly armed and nothing entered yet: start from an empty sequence, as a first note would. */
+        if (a->recording && !a->srec.started)
+            step_rec_start(&a->srec);
+        seq_set_length(s, len, P(a, P_APPEND_OVERWRITE));
+        seq_touched(a, s);
+        break;
+    }
+    case 2:
+        arp_set_random_length(&a->arp, (uint8_t)len);
+        break;
+    default:
+        break;
+    }
+}
+
 static void key_down(app_t *a, uint8_t k, uint8_t vel)
 {
     a->key_flags[k] = KEYF_DOWN;
     a->key_n[k] = 0;
     if (a->keys_down++ == 0)
         a->at_block = 2;
+
+    /* Rec held: the 16 channel keys add 1..16 to a length, applied when Rec is released
+     * (stock 0x08017520). Keys make no sound meanwhile. */
+    if (btn(a, APP_BTN_REC)) {
+        a->key_flags[k] |= KEYF_SHIFT;
+        if (k >= 16 && rec_length_target(a)) {
+            unsigned len = a->rec_len + 32u - k;
+            a->rec_len = (uint8_t)(len > SEQ_STEPS ? SEQ_STEPS : len);
+        }
+        return;
+    }
 
     /* While a chord is being captured (Shift + Hold held) keys are notes, not Shift functions. */
     if (shift(a) && a->chord.state != CHORD_CAPTURING) {
@@ -859,8 +900,9 @@ static void press(app_t *a, unsigned b)
         break;
     }
 
-    case APP_BTN_REC:
-        record_set(a, !a->recording, sh);
+    case APP_BTN_REC: /* acts on release: holding it with channel keys sets a length instead */
+        a->rec_shift = (uint8_t)sh;
+        a->rec_len = 0;
         break;
 
     case APP_BTN_TAP:
@@ -953,6 +995,12 @@ static void release(app_t *a, unsigned b)
             a->knob_div = a->pend_div;
             apply_div_knob(a);
         }
+        break;
+    case APP_BTN_REC:
+        if (a->rec_len)
+            rec_length_apply(a);
+        else
+            record_set(a, !a->recording, a->rec_shift);
         break;
     case APP_BTN_TAP:
         if (a->recording && !a->arp_mode && !playing(a)) {
@@ -1669,7 +1717,7 @@ static void update_leds(app_t *a)
         l |= 1u << APP_LED_PLAY;
     if (a->transport == TR_STOPPED)
         l |= 1u << APP_LED_STOP;
-    if (a->recording)
+    if (a->recording || (btn(a, APP_BTN_REC) && !a->arp_mode)) /* lit while held in Seq mode */
         l |= 1u << APP_LED_REC;
     if (shift(a))
         l |= 1u << APP_LED_SHIFT;

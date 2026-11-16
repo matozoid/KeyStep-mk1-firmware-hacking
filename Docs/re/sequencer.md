@@ -185,7 +185,26 @@ Button logic (UI handler 0x080142f0, transport state UI+0x0D: 0 stopped, 1 pause
 | Stop | Stop (cmd 0), ends record, triggers flash save of dirty sequences, saves the changed seq number to settings |
 | Shift + Play | Resync / restart (cmd 4) |
 | Shift + Stop | Delete last recorded step (step record only) (?: button id 6 inferred as Stop) |
-| Rec | Toggle record state UI+0x10 (0 off, 1 recording, 2 armed, blinking) |
+| Rec | Toggle record state UI+0x10 (0 off, 1 recording, 2 armed, blinking). Acts on release, and only if no length was entered (2.8) |
+| Rec held + channel keys | Set the sequence length (2.8) |
+
+### 2.8 Length entry with Rec held
+
+- Rec press (button handler 0x080142f0, at 0x08014866) sets the flag 0x20000060 and, in Seq mode,
+  lights the Rec LED. Record is not toggled yet.
+- Key down while the flag is set (0x08017520): the key makes no sound. In Seq mode, or in Arp mode
+  with the Random mode and "Arp Random" = Pattern, the 16 lowest keys (matrix index 16..31) add
+  `32 − index` to the byte 0x20000061: lowest key 1, sixteenth key 16. The sum is capped at 64.
+  Other keys add nothing.
+- Rec release (0x08014ac8) clears the flag. If the sum is non-zero:
+  - Seq mode: `seq_set_length_pad` (0x08015354) with the sum. If record was just armed and nothing
+    was entered yet, the sequence is cleared first, so this gives an empty sequence of that length.
+    New steps are padded with rests: all of them when settings+0x5C is 1 (clear), only the steps
+    that hold no note when it is 0 (keep). Shortening never erases anything by itself. The record
+    state stays as it was and the Rec LED is restored.
+  - Arp Pattern random: the sum becomes the loop length (arp_chord.md).
+  - The sum is reset to 0.
+- If the sum is zero, the release does the normal record toggle.
 
 ## 3. Recording
 

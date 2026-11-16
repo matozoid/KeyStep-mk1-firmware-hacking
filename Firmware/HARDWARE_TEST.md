@@ -28,6 +28,10 @@ Confirmed on a real unit:
 - Recorded steps survive a power cycle.
 - Step record with Tap (Tie to Previous): rest, a held key with two taps giving one note over two
   steps, and legato entry with Tap held. Tie to Next is covered by the host tests only.
+- Sequence length with Rec held + channel keys: confirmed while playing (4 → 3 → 4 → 2 → 4 steps,
+  hidden notes return when the length grows again, keys silent, record state untouched). The
+  Pattern random arp loop length and length entry right after arming are covered by the host
+  tests only.
 - Updater entry over SysEx (flag + reset) and with the button combo.
 
 Known and open:

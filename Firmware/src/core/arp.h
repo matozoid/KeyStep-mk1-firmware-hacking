@@ -53,6 +53,7 @@ void arp_set_hold(arp_t *a, int on);
 void arp_set_mode(arp_t *a, uint8_t mode);
 void arp_set_range(arp_t *a, int8_t range);
 void arp_set_random_variant(arp_t *a, uint8_t variant);
+void arp_set_random_length(arp_t *a, uint8_t len); /* loop length of the Pattern random variant */
 void arp_transport(arp_t *a, int running); /* start resets the octave cycle; stop clears everything */
 void arp_seed(arp_t *a, uint32_t seed);
 

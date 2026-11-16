@@ -272,6 +272,58 @@ static void test_transpose(void)
     CHECK_EQ(count(0x90, 60), 0);
 }
 
+static void rec_keys(const uint8_t *keys, unsigned n)
+{
+    app_buttons(&a, (uint8_t)(a.buttons | (1u << APP_BTN_REC)));
+    for (unsigned i = 0; i < n; i++) {
+        app_key(&a, keys[i], 100);
+        app_key(&a, keys[i], 0);
+    }
+    app_buttons(&a, (uint8_t)(a.buttons & ~(1u << APP_BTN_REC)));
+}
+
+/* Rec held + channel keys sets the sequence length (key 31 = 1 step ... key 16 = 16 steps). */
+static void test_rec_length(void)
+{
+    boot();
+    tap(APP_BTN_REC);
+    for (uint8_t k = 0; k < 4; k++) {
+        app_key(&a, k, 100);
+        app_key(&a, k, 0);
+    }
+    tap(APP_BTN_REC);
+    CHECK_EQ(a.seq[0].length, 4);
+    uint8_t n0 = a.seq[0].step[0][0].note, n3 = a.seq[0].step[3][0].note;
+
+    n_out = 0;
+    rec_keys((const uint8_t[]){30}, 1); /* 2 steps */
+    CHECK_EQ(a.seq[0].length, 2);
+    CHECK_EQ(a.recording, 0);          /* Rec did not toggle record */
+    CHECK_EQ(count(0x90, -1), 0);      /* keys were silent */
+    CHECK_EQ(a.seq[0].step[0][0].note, n0);
+
+    rec_keys((const uint8_t[]){28, 28}, 2); /* 4 + 4: content beyond the old end is kept */
+    CHECK_EQ(a.seq[0].length, 8);
+    CHECK_EQ(a.seq[0].step[3][0].note, n3);
+    CHECK(seq_step_is_rest(&a.seq[0], 4));
+
+    rec_keys((const uint8_t[]){16, 16, 24, 30}, 4); /* 16 + 16 + 8 + 2 */
+    CHECK_EQ(a.seq[0].length, 42);
+    rec_keys((const uint8_t[]){16, 16, 16, 16, 16}, 5); /* capped */
+    CHECK_EQ(a.seq[0].length, 64);
+
+    rec_keys((const uint8_t[]){5}, 1); /* not a channel key: nothing entered, Rec toggles */
+    CHECK_EQ(a.recording, 1);
+    CHECK_EQ(a.seq[0].length, 64);
+    /* freshly armed: a length gives an empty sequence of that size, record stays on */
+    rec_keys((const uint8_t[]){24}, 1);
+    CHECK_EQ(a.recording, 1);
+    CHECK_EQ(a.seq[0].length, 8);
+    CHECK(seq_step_is_rest(&a.seq[0], 0));
+    tap(APP_BTN_REC);
+    CHECK_EQ(a.recording, 0);
+}
+
 static void test_step_record(void)
 {
     boot();
@@ -698,6 +750,7 @@ int main(void)
     test_transport_internal();
     test_transpose();
     test_step_record();
+    test_rec_length();
     test_aftertouch();
     test_midi_in();
     test_sync_external();

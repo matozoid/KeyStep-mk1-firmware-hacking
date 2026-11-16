@@ -101,6 +101,8 @@ typedef struct {
     uint8_t transport;    /* enum app_transport */
     uint8_t armed_from_stop;
     uint8_t recording;
+    uint8_t rec_shift;    /* Shift was down when Rec was pressed */
+    uint8_t rec_len;      /* length entered with Rec held + channel keys, 0 = none */
     uint8_t stop_presses;
     uint32_t stop_window_ms;
     int16_t transpose;    /* note, -1 = none */

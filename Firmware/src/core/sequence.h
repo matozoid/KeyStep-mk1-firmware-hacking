@@ -67,6 +67,7 @@ typedef struct {
 } step_rec_t;
 
 void step_rec_arm(step_rec_t *r, sequence_t *seq, uint8_t tie_conv_default);
+void step_rec_start(step_rec_t *r); /* first input after arming: clear the sequence */
 void step_rec_note_on(step_rec_t *r, uint8_t note, uint8_t vel);
 void step_rec_note_off(step_rec_t *r, uint8_t note);
 void step_rec_tap(step_rec_t *r, int pressed);

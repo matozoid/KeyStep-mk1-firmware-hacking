@@ -27,6 +27,7 @@ Hardware details are in [hardware_map.md](hardware_map.md).
 | Shift + Oct+ + key | Kbd Play MIDI channel |
 | Shift + Hold | Chord mode on/off; hold both and play up to 16 notes to set the chord |
 | Shift + Rec | Record append |
+| Rec held + keys 1–16 | Set sequence length; presses add up, maximum 64. Also the loop length of the Pattern random arp |
 | Shift + Stop | Clear last step (Seq mode) |
 | Shift + Play | Restart Seq/Arp from the first step |
 | Shift + Mode/Time Div knob | New position applies when Shift is released |

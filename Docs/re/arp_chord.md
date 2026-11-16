@@ -105,8 +105,9 @@ The random algorithm has three variants, selected by settings byte
 | 1 | A fixed random pattern of length +0x12 (default 16): each step = random note + random octave 0..3 (sign follows range; 0 if outside range; plain note if > 127). Regenerated only when notes or octave range change → a repeating "random" riff. |
 | 2 | Pattern is built in Order; playback position does a random walk: bits 20–21 → 0: step back, 1: repeat, 2/3: step forward (wrapping). |
 
-Variant 1 length can be edited: in Random variant 1 (or Seq mode) the key
-handler adds `32−key` to 0x20000061 (capped at 64) (?).
+Variant 1 length can be edited with Rec held + channel keys, the same entry that sets the
+sequence length in Seq mode (sequencer.md 2.8). On Rec release the sum goes to +0x12 through
+0x0800d83e and the pattern is rebuilt.
 
 ## Octave handling (0x0800de98)
 

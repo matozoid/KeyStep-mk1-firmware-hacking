@@ -300,6 +300,12 @@ void arp_set_random_variant(arp_t *a, uint8_t variant)
     changed(a);
 }
 
+void arp_set_random_length(arp_t *a, uint8_t len)
+{
+    a->random_len = len < 1 ? 1 : len > SEQ_STEPS ? SEQ_STEPS : len;
+    changed(a);
+}
+
 void arp_transport(arp_t *a, int running)
 {
     a->running = (uint8_t)(running != 0);
