@@ -68,6 +68,8 @@ the Mk1, which has no screen.
   Linux, Windows, macOS (JVM desktop) and the web (Kotlin/Wasm or JS on Web MIDI). MIDI access per
   target: `javax.sound.midi` on desktop (macOS SysEx needs CoreMIDI4J or a native bridge), Web MIDI
   with SysEx permission in Chrome/Edge.
+  - Must match MCC feature for feature and setting for setting: checklist in
+    [mcc_parity.md](mcc_parity.md).
   - Features: all global settings (including the ones MCC hides, see
     [re/settings.md](re/settings.md) §2a), piano-roll editing of the 8 sequences, single-file
     backup/restore, `.mid` import/export, a MIDI monitor, and the firmware flasher below.
