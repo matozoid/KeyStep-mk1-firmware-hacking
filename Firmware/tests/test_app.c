@@ -397,6 +397,99 @@ static void test_sync_external(void)
     CHECK_EQ(a.transport, TR_STOPPED);
 }
 
+static void ext_clock(unsigned n)
+{
+    for (unsigned i = 0; i < n; i++) {
+        t_us += 20833;
+        app_poll(&a, t_us);
+        app_realtime_in(&a, APP_PORT_DIN, 0xF8);
+    }
+}
+
+/* Arm to Start: under an external clock the sequence follows silently until Play. */
+static void test_arm_to_start(void)
+{
+    boot();
+    tap(APP_BTN_REC);
+    for (uint8_t k = 0; k < 4; k++) {
+        app_key(&a, k, 100);
+        app_key(&a, k, 0);
+    }
+    tap(APP_BTN_REC);
+    app_switches(&a, APP_SYNC_MIDI, 0);
+    settings_set(&a.set, P_WAIT_BAR, 1);
+    unsigned T = a.player.T / CLOCK_TICKS_PER_F8; /* clock pulses per step */
+
+    /* master start: unit looks stopped, plays nothing, passes the clock on, counts along */
+    clear();
+    app_realtime_in(&a, APP_PORT_DIN, 0xFA);
+    CHECK_EQ(a.transport, TR_FOLLOW);
+    ext_clock(T * 2 + 1);
+    CHECK_EQ(count(0x90, -1), 0);
+    CHECK(count(0xF8, -1) >= (int)(T * 2));
+    CHECK_EQ(seq_player_step(&a.player), 2);
+    CHECK(led_bits & (1u << APP_LED_STOP));
+    CHECK(!(led_bits & (1u << APP_LED_PLAY)));
+
+    /* Play joins at the position it would have had: the next note is step 3 */
+    tap(APP_BTN_PLAY);
+    CHECK_EQ(a.transport, TR_PLAYING);
+    clear();
+    ext_clock(T);
+    CHECK_EQ(count(0x90, -1), 1);
+    CHECK_EQ(out[find(0x90, -1)].m[1], a.seq[0].step[3][0].note);
+
+    /* Play again mutes, position keeps running */
+    clear();
+    tap(APP_BTN_PLAY);
+    CHECK_EQ(a.transport, TR_FOLLOW);
+    CHECK_EQ(count(0x80, -1), 1);
+    clear();
+    ext_clock(T * 2);
+    CHECK_EQ(count(0x90, -1), 0);
+    CHECK(!(led_bits & (1u << APP_LED_STOP)));
+    CHECK_EQ(seq_player_step(&a.player), 1);
+    tap(APP_BTN_PLAY);
+    clear();
+    ext_clock(T);
+    CHECK_EQ(out[find(0x90, -1)].m[1], a.seq[0].step[2][0].note);
+
+    /* Stop while the master runs: silent, looks stopped, still following */
+    tap(APP_BTN_STOP);
+    CHECK_EQ(a.transport, TR_FOLLOW);
+    clear();
+    ext_clock(T);
+    CHECK_EQ(count(0x90, -1), 0);
+    CHECK(led_bits & (1u << APP_LED_STOP));
+    CHECK_EQ(seq_player_step(&a.player), 3);
+
+    /* master stop while following: really stopped */
+    app_realtime_in(&a, APP_PORT_DIN, 0xFC);
+    CHECK_EQ(a.transport, TR_STOPPED);
+    CHECK_EQ(seq_player_step(&a.player), 0);
+
+    /* no master: Play arms, a running clock without a start message is enough */
+    tap(APP_BTN_PLAY);
+    CHECK_EQ(a.transport, TR_ARMED);
+    clear();
+    ext_clock(1);
+    CHECK_EQ(a.transport, TR_PLAYING);
+    CHECK_EQ(count(0x90, -1), 1);
+    app_realtime_in(&a, APP_PORT_DIN, 0xFC);
+
+    /* setting off: a master start plays at once; internal sync ignores the setting */
+    settings_set(&a.set, P_WAIT_BAR, 0);
+    app_realtime_in(&a, APP_PORT_DIN, 0xFA);
+    CHECK_EQ(a.transport, TR_PLAYING);
+    app_realtime_in(&a, APP_PORT_DIN, 0xFC);
+    settings_set(&a.set, P_WAIT_BAR, 1);
+    app_switches(&a, APP_SYNC_INTERNAL, 0);
+    tap(APP_BTN_PLAY);
+    CHECK_EQ(a.transport, TR_PLAYING);
+    tap(APP_BTN_PLAY);
+    CHECK_EQ(a.transport, TR_PAUSED);
+}
+
 static void sysex(const uint8_t *f, uint8_t n)
 {
     app_sysex_in(&a, APP_PORT_USB, f, n, 1);
@@ -793,6 +886,7 @@ int main(void)
     test_arp();
     test_knobs();
     test_fine_tempo();
+    test_arm_to_start();
     test_factory_mode();
     return test_report("test_app");
 }

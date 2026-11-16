@@ -36,6 +36,12 @@ Confirmed on a real unit:
   left, and a knob move without Shift jumped back to the knob position. Tempo was measured from
   the MIDI clock over USB (about ±0.5 BPM), so the whole-BPM steps are covered by the host tests
   only.
+- Arm to Start with a USB clock from the PC (120 BPM): a master start left the unit silent with
+  the Stop LED lit; Play joined on the running grid, also in the middle of the sequence; Play
+  again muted and the next Play joined in time (nine cycles without drift); Stop muted and Play
+  joined again, also across a master stop and start; a master stop ended playback; Play pressed
+  with no clock armed and started with the master. Sync In, a DIN clock, arp mode and record
+  while following are not tested on hardware.
 - Updater entry over SysEx (flag + reset) and with the button combo.
 
 Known and open:

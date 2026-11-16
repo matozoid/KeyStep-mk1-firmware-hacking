@@ -71,7 +71,7 @@ Notes on the columns:
 | 0x2A | 0x56 | 100 | ≥1 | Fixed Velocity value |
 | 0x2B | 0x57 | 60 | — | Transpose Center Pitch |
 | 0x2C | 0x58 | 0 | sanitized ≤1 | sequencer/arp option (?). Not exposed by MCC. |
-| 0x2D | 0x59 | 0 | sanitized ≤1 | "Arm to Start" (MCC): 0 Off, 1 On. Code reading: wait for bar / quantised start under external clock (?) |
+| 0x2D | 0x59 | 0 | sanitized ≤1 | "Arm to Start" (MCC): 0 Off, 1 On. Under an external clock the sequencer follows silently until Play is pressed (sequencer.md 2.9) |
 | 0x2E | 0x5A | 0 | sanitized ≤1 | "Tie Mode" (MCC): 0 Tie to Previous, 1 Tie to Next. Copied into new sequences at seq+0x404 |
 | 0x2F | 0x5B | 0 | sanitized ≤2 | "Arp Random" (MCC): 0 Total, 1 Pattern, 2 Brownian (arp_chord.md) |
 | 0x30 | 0x5C | 0 | sanitized ≤1 | "Sequence Length Update" (MCC): 0 keep content beyond seq length, 1 clear it. Also read as the record length-append overwrite mode (sequencer.md) |

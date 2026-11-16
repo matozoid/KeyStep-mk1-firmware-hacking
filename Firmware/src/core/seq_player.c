@@ -69,8 +69,9 @@ static void step_on(seq_player_t *p, unsigned k)
     unsigned m = seq_step_notes(p->seq, k, notes, in_vels);
     unsigned n = 0;
 
-    if (m == 0) {
+    if (m == 0 || p->mute) {
         all_off(p);
+        p->tie_pending = 0;
         return;
     }
     for (unsigned i = 0; i < m; i++) {
@@ -158,6 +159,7 @@ void seq_player_start(seq_player_t *p, const sequence_t *s)
     p->queued = 0;
     reset_position(p);
     p->off_countdown = -1;
+    p->mute = 0;
     p->running = p->seq != 0;
 }
 
@@ -179,9 +181,20 @@ void seq_player_pause(seq_player_t *p)
 void seq_player_stop(seq_player_t *p)
 {
     p->running = 0;
+    p->mute = 0;
     p->off_countdown = -1;
     all_off(p);
     reset_position(p);
+}
+
+void seq_player_set_mute(seq_player_t *p, int on)
+{
+    p->mute = on != 0;
+    if (on) {
+        p->off_countdown = -1;
+        p->tie_pending = 0;
+        all_off(p);
+    }
 }
 
 void seq_player_restart(seq_player_t *p)

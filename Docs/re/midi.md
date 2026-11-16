@@ -209,7 +209,7 @@ The panic logic is in the button-press handler for button id 6 (Stop).
 2. A third press inside the window triggers the panic:
    - CC 123, value 0, is sent on all 16 channels to USB and DIN.
    - The gate is set low.
-   - The sync-out lines are reset. This is skipped when `settings+0x59` is set and `ui+0x13 == 2` (?).
+   - The sync-out lines are reset. This is skipped when Arm to Start (`settings+0x59`) is on and the master runs (`ui+0x13 == 2`).
 
 ## 5. Clock and transport sync
 
@@ -251,7 +251,7 @@ This handler runs only for the port that matches the sync source. For USB it run
 | F2 SPP | The 14-bit position goes to the clock (`0x0800e6dc`). Position 0 resets the counters. |
 | FA | Clock start, plus a UI "Play" event |
 | FB | Play event if the transport is stopped or paused |
-| FC | Stop event if playing. Also when `settings+0x59` is set and `ui+0x13 == 2` (pending start) (?) |
+| FC | Stop event if playing. Also when Arm to Start (`settings+0x59`) is on and the master runs (`ui+0x13 == 2`): the silent follow ends (sequencer.md 2.9) |
 | F8 | One clock tick: updates the tempo measurement and reloads the clock-loss timeout `0x20000084 = 20`, i.e. 2 s |
 
 Forwarding of incoming FA/FB/FC/F8:

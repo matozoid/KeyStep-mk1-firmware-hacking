@@ -38,6 +38,7 @@ typedef struct {
     uint8_t tie_pending;          /* previous note-off was held because of a tie */
     uint8_t next_mode;            /* enum seq_next_mode */
     uint8_t running;
+    uint8_t mute;                 /* keep the position running but play nothing */
 
     int8_t transpose;             /* semitones, folded into 0..127 by octaves */
     int8_t octave_shift;          /* extra semitones (arp octave), applied before transpose */
@@ -62,6 +63,7 @@ void seq_player_start(seq_player_t *p, const sequence_t *s); /* from step 0 */
 void seq_player_continue(seq_player_t *p);                   /* resume where paused */
 void seq_player_pause(seq_player_t *p);                      /* all notes off, keep position */
 void seq_player_stop(seq_player_t *p);                       /* all notes off, reset position */
+void seq_player_set_mute(seq_player_t *p, int on);            /* cleared by start and stop */
 void seq_player_restart(seq_player_t *p);                    /* resync to step 0 without stopping */
 void seq_player_set_division(seq_player_t *p, unsigned index);
 void seq_player_select(seq_player_t *p, const sequence_t *s); /* change sequence per next_mode */

@@ -156,8 +156,9 @@ Gate-off tick (`g` = hdr+0x402):
 | 1 Instant Reset | Switch at the next step boundary, restart from step 0 |
 | 2 Instant Continue | Switch at the next step, position = global tick mod (newLen·T) |
 
-Length changes made while playing are applied at a step boundary as well (gated by
-settings+0x59 / 0x20000063 (?)).
+Length changes made while playing are applied at a step boundary as well. The tick function
+(0x0800ea2c) applies them at once only when Arm to Start is off or the step player is not muted
+(section 2.9).
 
 ### 2.7 Transport
 
@@ -205,6 +206,41 @@ Button logic (UI handler 0x080142f0, transport state UI+0x0D: 0 stopped, 1 pause
   - Arp Pattern random: the sum becomes the loop length (arp_chord.md).
   - The sum is reset to 0.
 - If the sum is zero, the release does the normal record toggle.
+
+### 2.9 Arm to Start (settings+0x59, code 0x2D)
+
+Only matters under an external clock (source 1, 2 or 3 from 0x0800e5c8). The mechanism is one RAM
+flag, 0x20000063, that mutes the step player: the play-step function (0x080102a0) returns early
+when it is set and the note-off function (0x08010054) skips its work. The clock and the step
+position keep running.
+
+UI object fields used: +0x0D transport state (0 stopped, 1 paused or armed, 2 playing), +0x11
+armed (waiting for a clock), +0x13 external run state (2 = master is running), +0x09 fresh (start
+versus continue). The transport handler is 0x080142f0, the realtime handler 0x0800ce68.
+
+With the setting on:
+
+| Situation | Event | Result |
+|---|---|---|
+| Stopped | Master Start | Mute set, state 1, LEDs unchanged. The first clock byte starts the clock (+0x13 = 2). The unit looks stopped, follows silently and passes the clock on |
+| Following (muted) | Play | Mute cleared, state 2, Play LED on. Plays from the position it would have had |
+| Playing | Play | No clock pause. Mute set, notes off, Play LED blinks, state 1 |
+| Playing or following | Stop | No real stop. Mute set, notes off, state 1, LEDs as stopped |
+| Playing | Master Stop | Clock paused, Play LED blinks, state 1 (same as with the setting off) |
+| Following | Master Stop | Clock paused, state 0: really stopped |
+| Stopped, no master | Play | Armed, Play LED blinks. A Start or just a clock byte then starts audible play |
+
+Other details:
+
+- The triple-Stop panic does not reset the sync-out lines while the master runs.
+- Record-arm changes on Play are skipped for the events that come from the master.
+- Quirk: a master Start while playing acts like a Play press and mutes; a Start while following
+  un-mutes.
+- The Sync In source has its own variant in `button_on_press` that looks at the clock-loss flag
+  0x20000084 and the start line. Not fully decoded.
+
+The mute flag is also written by keyboard code (0x080172a0, 0x0801778e, 0x08017db2) and by the Tap
+handling in `button_on_press`; those uses are not decoded.
 
 ## 3. Recording
 
@@ -293,7 +329,7 @@ Offset = settings base 0x20005058 + 0x2C + SysEx parameter id (?).
 | +0x54 | Tempo knob mode: Jump / Pickup (?) |
 | +0x55 / +0x56 | Fixed-velocity enable / value |
 | +0x57 | Transpose centre note |
-| +0x59 | MCC "Arm to Start"; wait-for-bar / quantised start under external clock (?) |
+| +0x59 | MCC "Arm to Start": under an external clock, follow silently until Play (section 2.9) |
 | +0x5A | MCC "Tie Mode" (Tie to Previous / Next), copied into new sequences |
 | +0x5C | MCC "Sequence Length Update" (keep / clear content beyond length); length append overwrite mode |
 | +0x8C bit1 | Send transport messages |
@@ -304,6 +340,6 @@ Defaults and clamp ranges are in [settings.md](settings.md).
 ## 6. Open questions
 
 - Tap-tempo averaging and Jump/Pickup (around 0x080123b8–0x080134d8, object 0x200017E0).
-- Exact meaning of settings+0x51, +0x59, +0x93 and the 0x20000063 flag.
+- Exact meaning of settings+0x51 and +0x93. Other writers of the mute flag 0x20000063 (2.9).
 - The flash-writer buffer quirk in 1.5.
 - Role of 0x81 in stored data (written by the template loader for "tie" entries?).

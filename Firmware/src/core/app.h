@@ -38,7 +38,8 @@ enum app_led {
 /* Rear sync switch, same order as hw/panel.h. */
 enum app_sync { APP_SYNC_INTERNAL, APP_SYNC_USB, APP_SYNC_MIDI, APP_SYNC_IN };
 
-enum app_transport { TR_STOPPED, TR_ARMED, TR_PLAYING, TR_PAUSED };
+/* TR_FOLLOW: Arm to Start, the external clock runs and the position follows it, but nothing plays. */
+enum app_transport { TR_STOPPED, TR_ARMED, TR_PLAYING, TR_PAUSED, TR_FOLLOW };
 
 /* Save requests (bit = item). */
 #define APP_SAVE_SEQ(n)   (1u << (n))
@@ -100,6 +101,7 @@ typedef struct {
     /* transport and recording */
     uint8_t transport;    /* enum app_transport */
     uint8_t armed_from_stop;
+    uint8_t follow_blink; /* TR_FOLLOW entered with Play: Play LED blinks, else it looks stopped */
     uint8_t recording;
     uint8_t rec_shift;    /* Shift was down when Rec was pressed */
     uint8_t rec_len;      /* length entered with Rec held + channel keys, 0 = none */

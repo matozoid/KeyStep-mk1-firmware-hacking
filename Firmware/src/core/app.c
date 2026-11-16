@@ -299,6 +299,60 @@ static void transport_stop(app_t *a)
     cv_refresh(a);
 }
 
+/* Arm to Start (settings.md 0x2D, sequencer.md 2.9): under an external clock the sequencer does
+ * not run by itself. It follows the clock silently until Play is pressed. */
+static int arm_to_start(const app_t *a)
+{
+    return P(a, P_WAIT_BAR) && a->sync_src != APP_SYNC_INTERNAL;
+}
+
+/* The external clock started while we were stopped: count along without playing. */
+static void transport_follow(app_t *a)
+{
+    clock_reset(&a->clk, a->now_us);
+    seq_player_set_division(&a->player, a->div_index);
+    select_pattern(a);
+    seq_player_start(&a->player, active_pattern(a));
+    seq_player_set_mute(&a->player, 1);
+    if (a->transport != TR_FOLLOW)
+        a->follow_blink = 0;
+    a->transport = TR_FOLLOW;
+    set_sync_run(a, 1);
+}
+
+/* Play or Stop while the external clock runs: go silent but keep the position. */
+static void transport_mute(app_t *a, int from_play)
+{
+    seq_player_set_mute(&a->player, 1);
+    arp_transport(&a->arp, 0);
+    a->transport = TR_FOLLOW;
+    a->follow_blink = (uint8_t)from_play;
+    a->seq_gate_n = 0;
+    if (!from_play && a->recording)
+        record_set(a, 0, 0);
+    cv_refresh(a);
+}
+
+/* Play while following: play from the position the sequence would have had. */
+static void transport_join(app_t *a)
+{
+    a->transport = TR_PLAYING;
+    a->seq_gate_n = 0;
+    if (a->arp_mode) {
+        arp_transport(&a->arp, 1);
+        for (unsigned k = 0; k < APP_KEYS; k++)
+            if (a->key_flags[k] & KEYF_SOUNDING) {
+                arp_note_on(&a->arp, a->key_note[k], 100);
+                a->key_flags[k] |= KEYF_ARP;
+            }
+        arp_set_hold(&a->arp, a->hold_flag);
+    }
+    seq_player_set_mute(&a->player, 0);
+    if (a->recording)
+        rt_rec_reset(&a->rrec);
+    cv_refresh(a);
+}
+
 static void transport_pause(app_t *a)
 {
     seq_player_pause(&a->player);
@@ -379,9 +433,9 @@ static void run_tick(app_t *a)
     if ((f & CLOCK_OUT_MIDI_CLOCK) && clock_master(a))
         midi1(a, APP_PORT_ALL, 0xF8);
 
-    if (playing(a)) {
+    if (playing(a) || a->transport == TR_FOLLOW) {
         seq_player_tick(&a->player);
-        if (a->recording && a->player.tick_in_step == a->player.T / 2u)
+        if (playing(a) && a->recording && a->player.tick_in_step == a->player.T / 2u)
             rt_record_point(a);
         if (a->clk.sync_out != SYNC_OUT_1STEP_GATE && (f & (CLOCK_OUT_SYNC_HIGH | CLOCK_OUT_SYNC_LOW))) {
             a->sync_clock_level = (f & CLOCK_OUT_SYNC_HIGH) ? 1 : 0;
@@ -655,7 +709,7 @@ static void apply_mode_knob(app_t *a)
     a->seq_index = a->knob_mode;
     a->transpose = -1;
     update_transpose(a);
-    if (playing(a) || a->transport == TR_PAUSED)
+    if (playing(a) || a->transport == TR_PAUSED || a->transport == TR_FOLLOW)
         seq_player_select(&a->player, &a->seq[a->seq_index]);
     else
         a->player.seq = &a->seq[a->seq_index];
@@ -949,7 +1003,10 @@ static void press(app_t *a, unsigned b)
         }
         send_transport_cc(a, P_STOP_CH, P_STOP_CC, 127);
         send_mmc(a, 0x01);
-        transport_stop(a);
+        if (arm_to_start(a) && (playing(a) || a->transport == TR_FOLLOW))
+            transport_mute(a, 0); /* looks stopped, still follows the clock */
+        else
+            transport_stop(a);
         if (!a->stop_presses || a->now_ms - a->stop_window_ms > 600u) {
             a->stop_presses = 1;
             a->stop_window_ms = a->now_ms;
@@ -982,8 +1039,14 @@ static void press(app_t *a, unsigned b)
         case TR_PLAYING:
             if (P(a, P_PLAY_RESETS) && a->sync_src == APP_SYNC_INTERNAL)
                 seq_player_restart(&a->player);
+            else if (arm_to_start(a))
+                transport_mute(a, 1);
             else
                 transport_pause(a);
+            break;
+        case TR_FOLLOW:
+            send_mmc(a, 0x02);
+            transport_join(a);
             break;
         case TR_PAUSED:
             send_mmc(a, 0x02);
@@ -1204,12 +1267,20 @@ void app_realtime_in(app_t *a, uint8_t port, uint8_t st)
 
     switch (st) {
     case 0xFA:
-        transport_start(a);
+        /* differs: with Arm to Start the stock firmware treats a start while playing as a Play
+         * press (it mutes) and a start while following un-mutes. Here a start only resets the
+         * position: following stays silent, playing restarts as usual. */
+        if (arm_to_start(a) && (a->transport == TR_STOPPED || a->transport == TR_FOLLOW))
+            transport_follow(a);
+        else
+            transport_start(a);
         break;
     case 0xFB:
         if (a->transport == TR_PAUSED)
             transport_continue(a);
-        else if (a->transport != TR_PLAYING)
+        else if (a->transport == TR_STOPPED && arm_to_start(a))
+            transport_follow(a);
+        else if (a->transport != TR_PLAYING && a->transport != TR_FOLLOW)
             transport_start(a);
         break;
     case 0xFC:
@@ -1217,6 +1288,9 @@ void app_realtime_in(app_t *a, uint8_t port, uint8_t st)
             transport_stop(a);
         break;
     default:
+        /* Arm to Start: an armed Play also starts on a clock that is already running */
+        if (a->transport == TR_ARMED && arm_to_start(a))
+            transport_start(a);
         run_ticks(a, clock_ext_pulse(&a->clk, a->now_us));
         break;
     }
@@ -1228,6 +1302,8 @@ void app_sync_in_pulse(app_t *a)
         return;
     if (a->transport == TR_ARMED)
         transport_start(a);
+    else if (a->transport == TR_STOPPED && arm_to_start(a))
+        transport_follow(a);
     run_ticks(a, clock_ext_pulse(&a->clk, a->now_us));
 }
 
@@ -1730,11 +1806,11 @@ static void update_leds(app_t *a)
     uint8_t l = 0;
     if (playing(a))
         l |= 1u << APP_LED_PLAY;
-    else if (a->transport == TR_PAUSED && blink(a, 1000))
+    else if ((a->transport == TR_PAUSED || (a->transport == TR_FOLLOW && a->follow_blink)) && blink(a, 1000))
         l |= 1u << APP_LED_PLAY;
     else if (a->transport == TR_ARMED && blink(a, 250))
         l |= 1u << APP_LED_PLAY;
-    if (a->transport == TR_STOPPED)
+    if (a->transport == TR_STOPPED || (a->transport == TR_FOLLOW && !a->follow_blink))
         l |= 1u << APP_LED_STOP;
     if (a->recording || (btn(a, APP_BTN_REC) && !a->arp_mode)) /* lit while held in Seq mode */
         l |= 1u << APP_LED_REC;
@@ -1803,7 +1879,7 @@ uint16_t app_save_request(app_t *a)
 {
     /* A page erase stops the CPU for 20-40 ms, so saves start only while the transport is idle.
      * differs: the stock firmware also starts them while playing. */
-    if (a->transport == TR_PLAYING || a->recording)
+    if (a->transport == TR_PLAYING || a->transport == TR_FOLLOW || a->recording)
         return 0;
     uint16_t m = 0;
     if (due(a, a->seq_due_ms))
