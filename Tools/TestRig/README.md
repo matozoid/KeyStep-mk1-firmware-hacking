@@ -25,7 +25,7 @@ Tools/TestRig/keystep_testrig.sh --flash vendor/keystep_1_0_28.led  # restore st
 
 ## Flashing
 
-If a firmware is running (stock or open), the rig sends the updater handshake and the KeyStep restarts in bootloader mode by itself. Otherwise it asks you to hold **Record + Stop + Play** while plugging in USB; all three must be down before the plug goes in. In bootloader mode the unit shows up as `1c75:0208 KeyStep Updater`. The rig then uploads the image with `Tools/Uploader`, and the KeyStep restarts into the new firmware without a replug. The open firmware (`1209:0001 KeyStep Open`) is recognised as well as the stock one. The bootloader is never written, so a bad image can always be recovered by flashing the stock `.led`.
+If a firmware is running (stock or open), the rig sends the updater handshake and the KeyStep restarts in bootloader mode by itself. This also happens when you plug the KeyStep in after starting the rig. If no firmware runs, hold **Record + Stop + Play** while plugging in USB; all three must be down before the plug goes in. In bootloader mode the unit shows up as `1c75:0208 KeyStep Updater`. The rig then uploads the image with `Tools/Uploader`, and the KeyStep restarts into the new firmware without a replug. The open firmware (`1209:0001 KeyStep Open`) is recognised as well as the stock one. The bootloader is never written, so a bad image can always be recovered by flashing the stock `.led`.
 
 ## Requirements
 

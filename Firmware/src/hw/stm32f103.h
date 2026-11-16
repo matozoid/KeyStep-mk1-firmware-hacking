@@ -13,6 +13,10 @@ typedef struct {
 } SysTick_t;
 #define SYSTICK ((SysTick_t *)0xE000E010u)
 
+#define SYSTICK_COUNTFLAG (1u << 16)
+
+#define SCB_ICSR  REG32(0xE000ED04u)
+#define SCB_ICSR_PENDSTCLR (1u << 25)
 #define SCB_VTOR  REG32(0xE000ED08u)
 #define SCB_AIRCR REG32(0xE000ED0Cu)
 #define NVIC_ISER ((volatile uint32_t *)0xE000E100u)

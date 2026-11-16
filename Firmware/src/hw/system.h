@@ -12,6 +12,7 @@ void system_init(void);
 uint32_t millis(void);
 uint32_t micros(void);
 void delay_ms(uint32_t ms);
+void system_add_ms(uint32_t ms); /* interrupts off: make up for SysTick periods counted elsewhere */
 void system_reset(void);
 
 void gpio_config(GPIO_t *port, unsigned pin, uint32_t mode);

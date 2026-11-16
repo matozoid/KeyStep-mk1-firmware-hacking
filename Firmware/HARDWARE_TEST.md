@@ -30,8 +30,10 @@ Confirmed on a real unit:
 
 Known and open:
 
-- A flash save stops the main loop for about 50 ms per page (one MIDI clock gap of 69 ms seen
-  after Stop). Up to 9 pages can be saved in a row.
+- A flash save used to stop the main loop for about 50 ms per page (MIDI clock gap of 69 ms
+  after Stop). Saves now run in the background: the gap at Stop is 25 ms, within the timing noise
+  of the host log, and the worst gap seen is 43 ms. A page erase still stops the CPU for 20-40 ms;
+  that cannot be avoided on this chip.
 - Flipping the Seq/Arp switch while playing sends Stop and Start 2 ms apart. Compare with stock.
 - Not exercised yet: sections 3 to 5 below, pedal, DIN MIDI, sync, MCC.
 

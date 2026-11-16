@@ -100,25 +100,29 @@ if [ -n "$FLASH" ]; then
     fi
 
     # A running firmware (stock or open) enters the updater by itself on the updater handshake.
-    if ! usb_updater >/dev/null && usb_normal >/dev/null; then
-        RAW=$(amidi -l | awk 'tolower($0) ~ /keystep/ && tolower($0) !~ /updater/ {print $2; exit}')
-        if [ -n "$RAW" ]; then
-            log "== asking the running firmware to enter the updater ($RAW)"
-            amidi -p "$RAW" -S 'F0 5A 57 6E 28 3C 4E 3F F7' 2>&1 | tee -a "$LOG"
-            for _ in $(seq 20); do usb_updater >/dev/null && break; sleep 0.5; done
-        fi
-    fi
-    if ! usb_updater >/dev/null; then
-        wait_unplugged
-        log "== hold RECORD + STOP + PLAY and plug the KeyStep in (bootloader mode) ..."
-        until usb_updater >/dev/null; do
-            if usb_normal >/dev/null; then
-                log "   started in normal mode, not bootloader. Unplug and try again."
-                while usb_any >/dev/null; do sleep 0.3; done
-            fi
-            sleep 0.3
+    sysex_updater() {
+        local raw=
+        for _ in $(seq 12); do
+            raw=$(amidi -l 2>/dev/null | awk 'tolower($0) ~ /keystep/ && tolower($0) !~ /updater/ {print $2; exit}')
+            [ -n "$raw" ] && break
+            sleep 0.25
         done
+        [ -n "$raw" ] || return 1
+        log "== asking the running firmware to enter the updater ($raw)"
+        amidi -p "$raw" -S 'F0 5A 57 6E 28 3C 4E 3F F7' 2>&1 | tee -a "$LOG"
+        for _ in $(seq 20); do usb_updater >/dev/null && return 0; sleep 0.5; done
+        return 1
+    }
+    if ! usb_updater >/dev/null && ! usb_any >/dev/null; then
+        log "== plug the KeyStep in (if no firmware runs: hold RECORD + STOP + PLAY while plugging) ..."
     fi
+    until usb_updater >/dev/null; do
+        if usb_normal >/dev/null && ! sysex_updater; then
+            log "   the firmware did not enter the updater. Unplug, hold RECORD + STOP + PLAY, plug in."
+            while usb_any >/dev/null; do sleep 0.3; done
+        fi
+        sleep 0.3
+    done
     log "$(usb_updater)"
 
     HW=

@@ -34,6 +34,12 @@ void USART1_IRQHandler(void)
     }
 }
 
+void midi_uart_inject(const uint8_t *data, unsigned len)
+{
+    for (unsigned i = 0; i < len; i++)
+        ringbuf_put(&rx, data[i]);
+}
+
 int midi_uart_send(const uint8_t *data, unsigned len)
 {
     if (ringbuf_space(&tx) < len)

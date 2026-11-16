@@ -1733,8 +1733,8 @@ static int due(const app_t *a, uint32_t t)
 
 uint16_t app_save_request(app_t *a)
 {
-    /* Saves block for a few ms (page erase), so they wait until the transport is idle.
-     * differs: the stock firmware saves in the background while playing. */
+    /* A page erase stops the CPU for 20-40 ms, so saves start only while the transport is idle.
+     * differs: the stock firmware also starts them while playing. */
     if (a->transport == TR_PLAYING || a->recording)
         return 0;
     uint16_t m = 0;

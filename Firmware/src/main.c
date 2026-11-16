@@ -1,7 +1,7 @@
 /* KeyStep Mk1 open firmware: hardware glue around the application layer (core/app.c).
  *
  * The main loop polls every input, feeds it to the app, and performs the flash writes the app
- * asks for while the transport is idle. All behaviour lives in core/app.c. */
+ * asks for, in the background (save_tick). All behaviour lives in core/app.c. */
 #include <stdint.h>
 #include "hw/system.h"
 #include "hw/panel.h"
@@ -33,9 +33,13 @@ static uint8_t led_setting = 100;
 
 /* ---- app outputs ---- */
 
+static uint8_t clock_sent; /* a MIDI clock byte went out during this millisecond */
+
 static void io_midi(void *ctx, uint8_t ports, const uint8_t *msg, uint8_t len)
 {
     (void)ctx;
+    if (msg[0] == 0xF8)
+        clock_sent = 1;
     if (ports & APP_PORT_DIN)
         midi_uart_send(msg, len);
     if ((ports & APP_PORT_USB) && msg[0] != 0xF0 && msg[0] != 0xF7 && msg[0] >= 0x80)
@@ -204,25 +208,70 @@ static void factory_reset(void)
         flash_program(SETTINGS_PAGE + CAL_OFFSET, cal, sizeof cal);
 }
 
-static void save(uint16_t mask)
+/* Background save, one flash page at a time, called every 1 ms.
+ *
+ * A page erase stops everything for 20-40 ms (hw/flash.c), so it starts right after a MIDI clock
+ * byte has gone out: the next one is then late by a few ms at most instead of a whole erase. The
+ * page is then programmed a few half-words per call (about 50 us each), which takes 130 ms for a
+ * sequence. The app only asks for saves while the transport is idle; programming that has already
+ * started carries on if playback begins. */
+#define SAVE_HALFWORDS_PER_MS 4u
+#define SAVE_CLOCK_WAIT_MS    100u /* erase anyway when no clock is being sent */
+#define SAVE_IMG_SIZE         (sizeof(sequence_t) > CAL_OFFSET + 4u ? sizeof(sequence_t) : CAL_OFFSET + 4u)
+
+static void save_tick(void)
 {
-    static sequence_t img;
+    static union {
+        uint8_t b[SAVE_IMG_SIZE];
+        sequence_t seq;
+    } img;
+    static uint32_t addr, pos, len;
+    static uint8_t wait;
+
+    if (pos < len) {
+        for (unsigned n = 0; n < SAVE_HALFWORDS_PER_MS && pos < len; pos += 2) {
+            if (img.b[pos] == 0xFF && img.b[pos + 1] == 0xFF)
+                continue; /* same as erased */
+            flash_program(addr + pos, &img.b[pos], 2);
+            n++;
+        }
+        return;
+    }
+
+    uint16_t m = app_save_request(&app);
+    if (!m) {
+        wait = 0;
+        return;
+    }
+    if (!clock_sent && ++wait < SAVE_CLOCK_WAIT_MS)
+        return;
+    wait = 0;
+
+    /* take the snapshot now and clear the request, so that a later edit asks for a new save */
+    uint16_t item = APP_SAVE_SETTINGS;
     for (unsigned i = 0; i < SEQ_COUNT; i++) {
-        if (!(mask & APP_SAVE_SEQ(i)))
-            continue;
-        img = app.seq[i];
-        img.flags &= (uint8_t)~SEQ_FLAG_DIRTY;
-        uint32_t addr = SEQ_BASE + i * FLASH_PAGE_SIZE;
-        flash_erase_page(addr);
-        flash_program(addr, &img, sizeof img);
+        if (m & APP_SAVE_SEQ(i)) {
+            item = (uint16_t)APP_SAVE_SEQ(i);
+            img.seq = app.seq[i];
+            img.seq.flags &= (uint8_t)~SEQ_FLAG_DIRTY;
+            addr = SEQ_BASE + i * FLASH_PAGE_SIZE;
+            len = sizeof(sequence_t);
+            break;
+        }
     }
-    if (mask & APP_SAVE_SETTINGS) {
-        uint8_t cal[4] = {app.cal[0].hi, app.cal[0].lo, app.cal[1].hi, app.cal[1].lo};
-        flash_erase_page(SETTINGS_PAGE);
-        flash_program(SETTINGS_PAGE, app.set.v, SETTINGS_SIZE);
-        flash_program(SETTINGS_PAGE + CAL_OFFSET, cal, sizeof cal);
+    if (item == APP_SAVE_SETTINGS) {
+        for (unsigned i = 0; i < CAL_OFFSET; i++)
+            img.b[i] = i < SETTINGS_SIZE ? app.set.v[i] : 0xFF;
+        img.b[CAL_OFFSET + 0] = app.cal[0].hi;
+        img.b[CAL_OFFSET + 1] = app.cal[0].lo;
+        img.b[CAL_OFFSET + 2] = app.cal[1].hi;
+        img.b[CAL_OFFSET + 3] = app.cal[1].lo;
+        addr = SETTINGS_PAGE;
+        len = CAL_OFFSET + 4u;
     }
-    app_save_done(&app, mask);
+    app_save_done(&app, item);
+    pos = 0;
+    flash_erase_page(addr);
 }
 
 /* Buttons are scanned every 1 ms; a change counts once the raw mask has been the same for
@@ -331,8 +380,7 @@ int main(void)
             which ^= 1u;
         }
 
-        uint16_t m = app_save_request(&app);
-        if (m)
-            save(m);
+        save_tick();
+        clock_sent = 0;
     }
 }

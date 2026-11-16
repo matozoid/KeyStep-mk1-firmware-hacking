@@ -39,6 +39,7 @@ SECTIONS
     {
         _sdata = .;
         *(.data .data.*)
+        *(.ramfunc .ramfunc.*) /* code that runs while the flash is busy */
         . = ALIGN(4);
         _edata = .;
     } > RAM AT > FLASH

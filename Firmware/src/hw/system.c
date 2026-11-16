@@ -57,6 +57,11 @@ void SysTick_Handler(void)
     ms_ticks++;
 }
 
+void system_add_ms(uint32_t ms)
+{
+    ms_ticks += ms;
+}
+
 uint32_t millis(void)
 {
     return ms_ticks;
