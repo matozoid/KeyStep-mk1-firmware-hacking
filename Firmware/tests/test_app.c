@@ -382,19 +382,47 @@ static void test_midi_in(void)
 static void test_sync_external(void)
 {
     boot();
+    tap(APP_BTN_REC);
+    for (uint8_t k = 0; k < 8; k++) {
+        app_key(&a, k, 100);
+        app_key(&a, k, 0);
+    }
+    tap(APP_BTN_REC);
     app_switches(&a, APP_SYNC_MIDI, 0);
     tap(APP_BTN_PLAY);
     CHECK_EQ(a.transport, TR_ARMED);
     app_realtime_in(&a, APP_PORT_DIN, 0xFA);
     CHECK_EQ(a.transport, TR_PLAYING);
-    for (int i = 0; i < 24; i++) {
+    for (int i = 0; i < 32; i++) {
         t_us += 20833;
         app_poll(&a, t_us);
         app_realtime_in(&a, APP_PORT_DIN, 0xF8);
     }
     CHECK(count(0xF8, -1) >= 24); /* forwarded */
+
+    /* a master stop pauses: Continue resumes at the same step, Start begins again */
+    unsigned step = seq_player_step(&a.player);
+    CHECK(step > 0);
     app_realtime_in(&a, APP_PORT_DIN, 0xFC);
+    CHECK_EQ(a.transport, TR_PAUSED);
+    CHECK_EQ(seq_player_step(&a.player), step);
+    app_realtime_in(&a, APP_PORT_DIN, 0xFC); /* a second stop changes nothing */
+    CHECK_EQ(a.transport, TR_PAUSED);
+    app_realtime_in(&a, APP_PORT_DIN, 0xFB);
+    CHECK_EQ(a.transport, TR_PLAYING);
+    CHECK_EQ(seq_player_step(&a.player), step);
+    app_realtime_in(&a, APP_PORT_DIN, 0xFC);
+    app_realtime_in(&a, APP_PORT_DIN, 0xFA);
+    CHECK_EQ(a.transport, TR_PLAYING);
+    CHECK_EQ(seq_player_step(&a.player), 0);
+    app_realtime_in(&a, APP_PORT_DIN, 0xFC);
+    tap(APP_BTN_STOP);
     CHECK_EQ(a.transport, TR_STOPPED);
+
+    /* armed and no clock yet: a master stop does not disarm */
+    tap(APP_BTN_PLAY);
+    app_realtime_in(&a, APP_PORT_DIN, 0xFC);
+    CHECK_EQ(a.transport, TR_ARMED);
 }
 
 static void ext_clock(unsigned n)

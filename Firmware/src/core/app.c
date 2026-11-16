@@ -361,7 +361,6 @@ static void transport_pause(app_t *a)
     if (clock_master(a))
         midi1(a, APP_PORT_ALL, 0xFC);
     set_sync_run(a, 0);
-    send_mmc(a, 0x09);
     cv_refresh(a);
 }
 
@@ -1041,8 +1040,10 @@ static void press(app_t *a, unsigned b)
                 seq_player_restart(&a->player);
             else if (arm_to_start(a))
                 transport_mute(a, 1);
-            else
+            else {
                 transport_pause(a);
+                send_mmc(a, 0x09);
+            }
             break;
         case TR_FOLLOW:
             send_mmc(a, 0x02);
@@ -1284,7 +1285,11 @@ void app_realtime_in(app_t *a, uint8_t port, uint8_t st)
             transport_start(a);
         break;
     case 0xFC:
-        if (a->transport != TR_STOPPED)
+        /* A master stop pauses, so a Continue resumes at the same step. Only a silent follow
+         * (Arm to Start) ends completely. Armed and paused states are left alone. */
+        if (a->transport == TR_PLAYING)
+            transport_pause(a);
+        else if (a->transport == TR_FOLLOW)
             transport_stop(a);
         break;
     default:

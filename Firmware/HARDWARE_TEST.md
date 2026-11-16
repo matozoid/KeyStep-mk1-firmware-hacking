@@ -42,6 +42,8 @@ Confirmed on a real unit:
   joined again, also across a master stop and start; a master stop ended playback; Play pressed
   with no clock armed and started with the master. Sync In, a DIN clock, arp mode and record
   while following are not tested on hardware.
+- Master stop and continue with a USB clock from the PC: a stop in the middle of the sequence
+  paused, a continue resumed at the paused step, and a start began again at the first step.
 - Updater entry over SysEx (flag + reset) and with the button combo.
 
 Known and open:
