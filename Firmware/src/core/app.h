@@ -124,6 +124,8 @@ typedef struct {
     /* tempo knob */
     uint16_t tempo_raw;
     uint8_t tempo_picked; /* pickup mode: knob has caught the current tempo */
+    uint8_t tempo_fine;   /* Shift + Rate: base tempo captured */
+    uint16_t tempo_base;  /* whole BPM x 100 that Shift + Rate moves around */
 
     /* CV ownership */
     uint8_t seq_note, seq_gate_n;           /* last player note, sounding count */

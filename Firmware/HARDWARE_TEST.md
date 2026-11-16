@@ -32,6 +32,10 @@ Confirmed on a real unit:
   hidden notes return when the length grows again, keys silent, record state untouched). The
   Pattern random arp loop length and length entry right after arming are covered by the host
   tests only.
+- Shift + Rate fine tempo: from about 141 BPM the knob gave about 151 fully right and 131 fully
+  left, and a knob move without Shift jumped back to the knob position. Tempo was measured from
+  the MIDI clock over USB (about ±0.5 BPM), so the whole-BPM steps are covered by the host tests
+  only.
 - Updater entry over SysEx (flag + reset) and with the button combo.
 
 Known and open:

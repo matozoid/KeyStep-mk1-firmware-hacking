@@ -621,6 +621,37 @@ static void test_cmd(uint8_t b7, uint8_t b8, uint8_t idx, uint8_t v)
     sysex(f, sizeof f);
 }
 
+/* Shift + Rate: whole BPM, within 10 of the tempo that was set when the knob first moved. */
+static void test_fine_tempo(void)
+{
+    boot();
+    app_knobs(&a, 1820, 0xFFF, 0x1D6);
+    CHECK_EQ(a.clk.bpm100, 12333);
+    app_buttons(&a, 1u << APP_BTN_SHIFT);
+    app_knobs(&a, 1900, 0xFFF, 0x1D6); /* first movement only captures 123.00 */
+    CHECK_EQ(a.clk.bpm100, 12333);
+    app_knobs(&a, 2048, 0xFFF, 0x1D6); /* centre */
+    CHECK_EQ(a.clk.bpm100, 12300);
+    app_knobs(&a, 2300, 0xFFF, 0x1D6);
+    CHECK_EQ(a.clk.bpm100, 12400);
+    app_knobs(&a, 4095, 0xFFF, 0x1D6);
+    CHECK_EQ(a.clk.bpm100, 13300);
+    app_knobs(&a, 0, 0xFFF, 0x1D6);
+    CHECK_EQ(a.clk.bpm100, 11300);
+    app_buttons(&a, 0);
+    app_buttons(&a, 1u << APP_BTN_SHIFT); /* base survives releasing Shift */
+    app_knobs(&a, 4095, 0xFFF, 0x1D6);
+    CHECK_EQ(a.clk.bpm100, 13300);
+    app_buttons(&a, 0);
+    app_knobs(&a, 2100, 0xFFF, 0x1D6); /* plain knob: full range again */
+    CHECK_EQ(a.clk.bpm100, 13769);
+    app_buttons(&a, 1u << APP_BTN_SHIFT); /* new base 137.00 */
+    app_knobs(&a, 2200, 0xFFF, 0x1D6);
+    app_knobs(&a, 0, 0xFFF, 0x1D6);
+    CHECK_EQ(a.clk.bpm100, 12700);
+    app_buttons(&a, 0);
+}
+
 static void test_factory_mode(void)
 {
     boot();
@@ -761,6 +792,7 @@ int main(void)
     test_leds();
     test_arp();
     test_knobs();
+    test_fine_tempo();
     test_factory_mode();
     return test_report("test_app");
 }

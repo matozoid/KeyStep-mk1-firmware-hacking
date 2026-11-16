@@ -14,7 +14,7 @@ Hardware details are in [hardware_map.md](hardware_map.md).
 - Sustain pedal: polarity sensed at power-up. Mode momentary / latching; function Hold, Sustain or
   both; CC number and min/max values assignable.
 - Hold button: same options as the pedal (momentary/latching, Hold/Sustain/both).
-- Rate knob 30–240 BPM, Jump or Pick-up mode. Tap tempo averages 2, 3 or 4 taps.
+- Rate knob 30–240 BPM, Jump or Pick-up mode. Shift + Rate: whole BPM, up to 10 either side. Tap tempo averages 2, 3 or 4 taps.
 
 ## Shift combinations
 

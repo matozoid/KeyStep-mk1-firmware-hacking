@@ -816,6 +816,25 @@ void app_knobs(app_t *a, uint16_t tempo, uint16_t mode, uint16_t timediv)
     uint32_t bpm = CLOCK_BPM100_MIN + (uint32_t)tempo * (CLOCK_BPM100_MAX - CLOCK_BPM100_MIN) / 4095u;
     uint32_t prev = CLOCK_BPM100_MIN + (uint32_t)a->tempo_raw * (CLOCK_BPM100_MAX - CLOCK_BPM100_MIN) / 4095u;
     a->tempo_raw = tempo;
+    if (shift(a)) {
+        /* Shift + Rate: whole BPM, at most 10 either side of the tempo at the first movement
+         * (stock 0x080134d8). That first movement only captures the base. The base is kept
+         * until the knob moves without Shift. */
+        if (!a->tempo_fine) {
+            a->tempo_base = (uint16_t)(a->clk.bpm100 / 100u * 100u);
+            a->tempo_fine = 1;
+            return;
+        }
+        int v = (int)(tempo * 255u / 4095u);
+        int fine = (int)a->tempo_base + (v - 127) * 1000 / 12700 * 100;
+        if (fine < (int)CLOCK_BPM100_MIN)
+            fine = (int)CLOCK_BPM100_MIN;
+        if (fine > (int)CLOCK_BPM100_MAX)
+            fine = (int)CLOCK_BPM100_MAX;
+        clock_set_bpm100(&a->clk, (uint32_t)fine);
+        return;
+    }
+    a->tempo_fine = 0;
     if (P(a, P_TEMPO_PICKUP) && !a->tempo_picked) {
         /* pickup: wait until the knob passes the current tempo */
         uint32_t cur = a->clk.bpm100;

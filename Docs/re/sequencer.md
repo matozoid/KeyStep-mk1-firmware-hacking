@@ -267,6 +267,13 @@ counters, Tap state, real-time buffer, current/next sequence pointers).
 
 - External sync: each incoming pulse is expanded to `ticksPerPulse − alreadyInterpolated + 1`
   ticks, so the internal 480 PPQN keeps running between pulses and catches up.
+- Shift + tempo knob (`tempo_knob_process` 0x080134d8, Shift flag 0x2000005F, internal sync only):
+  the first knob change with Shift held only stores the current tempo rounded down to a whole BPM
+  (knob object +0x30) and sets the flag +0x29. Each later change sets
+  `tempo = base + ((v − 127) × 1000 / 12700) × 100`, v = 8-bit knob position, integer division,
+  clamped to 30.00..240.00. That is whole BPM steps, −10..+10 around the base, knob centre = base.
+  The flag is cleared only by a knob change without Shift, so releasing Shift and holding it again
+  keeps the same base. The pickup state is not touched.
 - Tap tempo: a period is measured and converted to BPM; the tempo knob pickup accepts the range
   30.00..240.00 BPM. Averaging depth is settings+0x4E (2..4 taps, per the clamp rules in settings.md). Jump vs. Pickup is
   probably settings+0x54 (?). Not decoded in detail.
