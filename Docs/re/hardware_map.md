@@ -71,7 +71,7 @@ Button objects (ctor 0x0800f9d2, handler press 0x0800f3a0 / release 0x0800f7f0, 
 |---|---|---|
 | Sync source selector. Code = ~(PE3 \| PE2 << 1) & 3: 0 Internal, 1 USB, 2 Sync In, 3 MIDI | PE2, PE3 (2-bit, inverted) | 0x08018a46, 0x08018994 → clock `set_source` 0x0800e5d0 |
 | Seq / Arp mode switch: high = Seq, low = Arp | PE4 | 0x08011cb4 → `ui_set_seq_arp` 0x08014070 |
-| LED level select (?) | PD4 | 0x0800f20c. High: LEDs at 90 % of the brightness setting; low: 20 %, with a short fade between the two. What drives it is unknown (power/USB detect?) |
+| LED level select | PD4 | 0x0800f20c, polled every main-loop pass. High: LEDs at 90 % of the brightness setting; low: 20 %. Fades are described under LEDs below. The pin is the DC power jack detect: the factory test reads it as "DCin Plug" (sysex.md 5.4), so the LEDs run brighter on an adapter than on USB power. |
 
 ### Analog inputs (ADC1, 5-channel scan, DMA1 ch1)
 
@@ -181,6 +181,18 @@ Bit 5 (Rec) lights when recording starts, follows the steps while recording, and
 the mode switch selects Arp. The LED numbers come from `button_ctor` (id, led): Tap is built with
 LED 6; the Record button passes no LED and its handler drives bit 5 directly.
 Driver object `0x20000F88`: ctor 0x08013dd8, set bit 0x08013ae8, flush 0x08013da4, blink scheduler 0x08013b54.
+
+**Brightness fades** (0x08013c1c starts one, 0x08013968 steps it). A countdown at `0x2000004E` is
+decremented once per ms by SysTick (every 10th tick). At boot the level ramps up from 0: to the
+full level at 10 ms per percent, or to the low level at 20 ms per percent. When PD4 changes, the
+level fades between the low and full levels at 10 ms per percent. A brightness setting change
+while no fade is running applies at once, never below 1 %.
+
+**Power-up light show** (`leds_boot_animation` 0x0801379c, blocking). The LEDs are lit one at a
+time in the order Play, Stop, Rec, Tap, Hold, Oct−, Oct+, Shift (table at 0x08019d58). Each fades
+0→30 % over 60 ms and back to 0 over 60 ms. Then all LEDs fade 0→20→0 % over 400 ms, and all go
+dark. A second run happens before the factory reset (Oct− + Oct+ held, or blank sequence flash):
+it walks Hold, Oct−, Oct+, Shift twice.
 
 ### MIDI / USB
 

@@ -97,34 +97,54 @@ A get with `b8 < 0x40` replies with value 0.
 
 | b8 | idx | value | Effect |
 |---|---|---|---|
-| 0x10 | LED number | 0/1 | Sets that LED (0x0800ce1c). The value bit is inverted. |
+| 0x10 | control ID | 0 / non-zero | Sets the LED of that control (0x0800ce1c): non-zero lights it. IDs: Stop 0x59, Play 0x5A, Hold 0x55, Oct+ 0x11, Oct− 0x10, Rec 0x57, Tap 0x67, Shift 0x56. Only visible in test mode, where the normal LED logic is off. |
 | others | — | — | none found (?) |
 
 ### 5.2 Factory loopback tests (need a test jig)
 
 | b8 | Function | Behaviour |
 |---|---|---|
-| 0x70 | `test_din_loop` 0x08011148 | Sends `B5 55 4A` on the DIN out and expects it back on the DIN in |
-| 0x71 | `test_sync_clock_loop` 0x08010ef0 | Toggles the sync clock out and checks the clock in. On pass, replies with the CC packet `B0 02 71` on USB. |
+| 0x70 | `test_din_loop` 0x08011148 | Sends `B5 55 4A` on the DIN out. When that message comes back on the DIN in while test mode is on, replies `B0 02 70` on USB. |
+| 0x71 | `test_sync_clock_loop` 0x08010ef0 | Five times: drives the sync clock out low, then high, and checks that the clock in follows each time. On pass, replies with the CC packet `B0 02 71` on USB; a failure sends nothing. |
 | 0x72 | `test_sync_start_loop` 0x08010f40 | Same for the start/stop line. Pass replies `B0 02 72`. |
-| 0x74 | `test_pedal_adc` 0x08010fe4 | Pedal ADC average must lie in 0x971..0x997. Pass replies `B0 02 74`. |
+| 0x74 | `test_pedal_adc` 0x08010fe4 | The average of 16 pedal ADC readings must lie in 0x971..0x997 (a fixed resistor in the test plug). Pass replies `B0 02 74`. |
 
 ### 5.3 Direct CV drive (`b8 = 0x73`)
 
 | idx | Effect |
 |---|---|
-| 0x10 | Pitch CV set to note `value` |
-| 0x11 | Mod CV set from `value`, scaled to a 0x319C mV (12.7 V) full range |
-| 0x12 | Gate on/off. Values 1 and 2 also select the gate level mode. |
+| 0x10 | Pitch CV set to note `value` with the bend centred (values above 0x7E give note 0) |
+| 0x11 | Mod CV DAC code set to `value` × 4095 / 127 (0x7F and above give 0). The test tool expects `value` 0x60 to measure 10.0 V, which puts the analogue full scale near 13.2 V. |
+| 0x12 | Gate on for non-zero `value`, off for 0. Values 1 and 2 also select the gate level mode. |
 
 ### 5.4 Diagnostic flags (`b7 = 0x7D, b8 = 0x7D`)
 
 | idx | Effect |
 |---|---|
 | 0x03 | Test flag bit0 (+0xAC) |
-| 0x09 | Test mode on/off (settings +0xA9). Entering it (`test_mode_enter` 0x08010f90) forces gate type 1 and redirects the strips and pedal to report over SysEx. |
+| 0x09 | Test mode: on when `value` > 0x40, else off (settings +0xA9). Entering it (`test_mode_enter` 0x08010f90) forces gate type 1, stops the transport (it fakes a Stop press and release) and turns all LEDs off. |
 | 0x0A | Test flag bit1 |
-| 0x0B | LED test pattern (0x08013776) (?) |
+| 0x0B | `value` 0: all LEDs off; otherwise all LEDs on (0x08013776) |
+
+**Reports in test mode.** The panel controls stop doing their normal job and are reported to USB
+as Control Change messages on channel 1 (`B0 id value`) instead. The keys still play.
+
+| Control | id | value |
+|---|---|---|
+| Button press (releases are not reported) | control ID (5.1) | 1 |
+| Pitch strip | 0x41 | position 0..127, when it changes; nothing when released |
+| Mod strip | 0x40 | same |
+| Tempo knob | 0x66 | position 0..127 |
+| Mode knob | 0x15 | detent 1..8 |
+| Time-division knob | 0x68 | detent 1..8 |
+| Seq/Arp switch | 0x12 | 1 = Seq, 0 = Arp |
+| Sync switch | 0x13 | 0 Int, 1 USB, 2 Sync In, 3 MIDI |
+| Sustain pedal | 0x42 | 1 down, 0 up |
+| DC jack (PD4) | 0x60 | 1 = DC adapter plugged in |
+
+The open firmware implements all of section 5. Differences: on leaving test mode it restores the
+gate type from the settings (stock keeps gate type 1 until the next settings change), and
+clearing a test flag clears only that flag (see the bug below).
 
 `settings_test_flag_set` 0x08018588 has a bug: clearing a flag ANDs with the mask instead of with its inverse, so it clears all the other flags too.
 
@@ -191,7 +211,7 @@ A sequence is 0x408 bytes: 64 steps × 8 slots × (note, velocity), then +0x400 
 The reply is built by `sysex_identity_handler` 0x080129cc and sent via `sysex_send_universal` 0x08016d38. Its fields:
 - family 0x0002;
 - model 0x0008;
-- 4 version bytes `1C 00 01 01`. They come from the words at 0x08019BD4, which are {1, 1, 0, 28}, sent in reverse order (?).
+- 4 version bytes `1C 00 01 01`. They come from the words at 0x08019BD4, which are {1, 1, 0, 28}, sent in reverse order. Confirmed on hardware (usb.md §7).
 
 ## 8. Updater entry
 

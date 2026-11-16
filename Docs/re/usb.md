@@ -159,3 +159,23 @@ As a result, USB input is turned back into a byte stream and parsed like DIN. Pa
 - Re-using VID 0x1C75 / PID 0x0288 and the "Arturia KeyStep 32" product string keeps MCC and existing DAW port mappings working. MCC probably matches on VID/PID and on the identity reply (sysex.md §7) (?).
 - The fixed serial number `00000000001A` means two KeySteps on one host look identical apart from their port path.
 - The descriptor set is a plain single-cable USB-MIDI 1.0 device, so any class-compliant stack (TinyUSB, libopencm3) can reproduce it byte-for-byte.
+
+## 7. Checked on hardware
+
+Checked on 2026-11-16 against a unit running stock firmware 1.1.0.28, with `Tools/TestRig/keystep_testrig.sh`: about 32,000 events from four sessions, all played by hand.
+
+| Item | Result |
+|---|---|
+| Enumeration | `1c75:0288`, "Arturia KeyStep 32", serial `00000000001A`, bus-powered at 100 mA. The interfaces, jacks and endpoints (EP 0x02 OUT and EP 0x81 IN, both bulk, 64 bytes) match §2–§4. Linux logs "Quirk or no altset; falling back to MIDI 1.0", which is harmless. |
+| ALSA | One port, "Arturia KeyStep 32 MIDI 1". |
+| Identity reply | `F0 7E 7F 06 02 00 20 6B 02 00 08 00 1C 00 01 01 F7`, byte-identical to sysex.md §7. The version reads 1.1.0.28, sent in reverse byte order, and matches the MCC `.led` version. |
+| Channel | Every channel message came on channel 1 (the factory default). |
+| Notes | 1615 note-ons and 1615 note-offs, so none were stranded. Note-on velocity covered 1–124, and every note-off had velocity 64 (keyboard.md §1). Notes 40–100 were seen, which needs octave shifts. |
+| Aftertouch | Channel pressure (`Dn`) over the full range 0–127. This is the busiest message type by far after clock. |
+| Pitch strip | Pitch bend from −8064 to +8191. The minimum is v = 1, not 0 (keyboard.md bend table), which points to strip calibration rather than firmware. |
+| Mod strip | CC 1 (default of setting 0x14). |
+| Transport | Play sends CC 54 = 127 and then `FA` Start (or `FB` Continue after a pause), then CC 54 = 0 on release. Stop sends CC 51 = 127 and then `FC`, then CC 51 = 0. Record sends CC 50 = 127 when it turns on and 0 when it turns off. The CC numbers and values match the settings defaults 0x64–0x66 (settings.md) and midi.md §4.1. |
+| Clock | `F8` at 24 PPQN with the sync switch on Internal, sent continuously, also while stopped (midi.md §5.1). |
+| Silent | The tempo, Mode and Time-division knobs and the Seq/Arp switch send no MIDI in normal mode. They act only on the device. |
+
+Not checkable over USB: the CV, gate and sync outputs, and the DIN port.

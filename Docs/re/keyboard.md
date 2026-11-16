@@ -18,7 +18,7 @@ SysTick runs at **10 kHz**, not 1 kHz as hardware_map.md says. SystemClock_Confi
 
 ### Matrix and note numbers
 - There are 4 groups of 8 keys. Group g reads matrix line 2g (first contact, "c1") and line 2g+1 (second contact, "c2"). Readers: 0x08016f3c / 0x08016f4e → 0x08011b4a.
-- Key index k runs 0..31. Note = 72 − k + octave·12 (+ transpose, see 4). So k=0 is the top key (C, 72 at octave 0) and k=31 is the bottom key (41) (?). Verify the key-to-index order on hardware.
+- Key index k runs 0..31. Note = 72 − k + octave·12 (+ transpose, see 4). So k=0 is the top key (C, 72 at octave 0) and k=31 is the bottom key (41). The matrix driver (select 0x080165ea drives PE(8+line) low, read 0x080165b8 returns the inverted PD8–PD15) and the indexing k = 8g + bit are the same in the open firmware, so it maps every key to the same note as stock. Only the physical position of each index is unconfirmed (?).
 - The note-on stores the octave offset (kb+0x24+k) and the MIDI channel (kb+0x267+k) for that key. The matching note-off uses those stored values, so an octave or channel change while a key is held never strands notes.
 - A computed note below 0 is skipped (octave −4 on the lowest keys). The top is not clamped: the highest is 72+48 = 120.
 
@@ -53,7 +53,7 @@ The state byte is at kb+0x44+k:
 ## 2. Velocity curves
 
 - Selector: param 0x19 (settings+0x45), read in 0x08018314. Curve tables: 0 → kb+0x248, 1 → kb+0x24c, 2 → kb+0x250.
-- Manual order is Linear / Logarithmic / Anti-log. Which index is which is a guess from shape (?): curve 2 falls fastest, so it gives the loudest response to medium strokes.
+- Index names, from the vendor editor's device definition: 0 Lin, 1 Log, 2 AntiLog (aftertouch adds 3 Soft). The shapes agree: for the same travel time curve 1 gives a higher velocity than curve 0, and curve 2 a lower one.
 - x = time between contacts in **100 µs ticks**.
 - Each curve is piecewise linear with 6 segments (x0, y0, x1, y1, a, b, c). Evaluator: 0x08018b5a; per segment 0x08011858.
 - For x0 < x ≤ x1: y = a·x / b − c (C integer division, truncating toward 0), clamped between y1 and y0.
@@ -240,7 +240,6 @@ When settings+0xA9 is set, the strips and pedal report through 0x0801107c / 0x08
 
 ## Open questions
 - Real main-loop (scan) rate. Measure on hardware.
-- Which curve index is Lin / Log / Anti-log, for both velocity and AT.
 - Hold/pedal mode value 0/1 vs the MCC "Gate/Toggle" labels.
 - Purpose of flag 0x20000068 and bit 0x100 at +0x80c.
 - Whether the top key is index 0 / note 72 (pin order).
